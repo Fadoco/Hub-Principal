@@ -47,7 +47,7 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
     let cancelled = false
     const locationQuery = local && location ? location.city : ''
     if (local && !location) return
-    const searchQuery = local ? locationQuery : `${smartQuery} when:7d`
+    const searchQuery = local ? `${locationQuery} noticias` : `${smartQuery} when:7d`
     const cacheKey = `hub-news:${searchQuery}`
     const loadNews = async () => {
       const cached = sessionStorage.getItem(cacheKey)
