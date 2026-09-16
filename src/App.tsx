@@ -36,13 +36,30 @@ function CurrencyPanel() {
 }
 type NewsItem = { title: string; link: string; pubDate: string; author?: string }
 type NewsPanelProps = { location: LocationInfo | null; title: string; query: string; local?: boolean }
+const NEWS_CACHE_TTL = 300000
+function normalizeNewsItems(items: NewsItem[]) { const unique = new Map<string, NewsItem>(); items.filter((item) => item.title && item.link).forEach((item) => { const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); if (!unique.has(key)) unique.set(key, item) }); return [...unique.values()].sort((first, second) => new Date(second.pubDate).getTime() - new Date(first.pubDate).getTime()).slice(0, 8) }
 function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
   const [items, setItems] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
-    const loadNews = async () => { if (local && !location) return; setLoading(true); try { const locationQuery = local && location ? `${location.city} ${location.state}` : ''; const searchQuery = encodeURIComponent(`${query} ${locationQuery}`); const rss = encodeURIComponent(`https://news.google.com/rss/search?q=${searchQuery}&hl=pt-BR&gl=BR&ceid=BR:pt-419`); const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rss}`); if (!response.ok) throw new Error('news'); const data = await response.json(); setItems((data.items || []).slice(0, 5)); setError(false) } catch { setError(true) } finally { setLoading(false) } }
-  useEffect(() => { loadNews(); const timer = window.setInterval(loadNews, 300000); return () => window.clearInterval(timer) }, [location])
-  const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(`${query} ${local && location ? `${location.city} ${location.state}` : ''}`)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
+  const smartQuery = query === 'noticias jogos games' ? 'noticias jogos games lancamentos Nintendo PlayStation Xbox PC' : query === 'noticias filmes cinema' ? 'noticias filmes cinema streaming Netflix trailers series' : query === 'noticias animes' ? 'noticias animes mangas lancamentos temporada Crunchyroll' : query === 'noticias mundo internacional global' ? 'noticias mundo internacional tecnologia economia ciencia' : query === 'noticias' ? 'noticias prefeitura eventos transito cultura seguranca' : query
+  useEffect(() => {
+    let cancelled = false
+    const locationQuery = local && location ? `${location.city} ${location.state}` : ''
+    if (local && !location) return
+    const searchQuery = `${smartQuery} ${locationQuery} when:7d`
+    const cacheKey = `hub-news:${searchQuery}`
+    const loadNews = async () => {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) { try { const saved = JSON.parse(cached) as { timestamp: number; items: NewsItem[] }; if (Date.now() - saved.timestamp < NEWS_CACHE_TTL) { setItems(saved.items); setError(false); return } } catch { sessionStorage.removeItem(cacheKey) } }
+      setLoading(true)
+      try { const rss = encodeURIComponent(`https://news.google.com/rss/search?q=${encodeURIComponent(searchQuery)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`); const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rss}`); if (!response.ok) throw new Error('news'); const data = await response.json(); const nextItems = normalizeNewsItems(data.items || []); if (!cancelled) { setItems(nextItems); setError(false); sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: nextItems })) } } catch { if (!cancelled) setError(true) } finally { if (!cancelled) setLoading(false) }
+    }
+    loadNews()
+    const timer = window.setInterval(loadNews, NEWS_CACHE_TTL)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [location, smartQuery, local])
+  const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(`${smartQuery} ${local && location ? `${location.city} ${location.state}` : ''}`)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
   return <section className="news-panel"><div className="news-heading"><div><span className="section-kicker">PORTAL DE NOTÍCIAS</span><h3>{title}</h3></div><a className="news-search" href={searchUrl} target="_blank" rel="noreferrer"><Newspaper size={15} /> Ver todas</a></div>{loading && !items.length ? <div className="news-empty">Buscando notícias...</div> : error && !items.length ? <div className="news-empty">Não foi possível atualizar as notícias agora.</div> : <div className="news-list">{items.map((item) => <a className="news-item" href={item.link} target="_blank" rel="noreferrer" key={item.link}><span><strong>{item.title}</strong><small>{item.author || 'Google News'} · {new Date(item.pubDate).toLocaleDateString('pt-BR')}</small></span><ExternalLink size={14} /></a>)}</div>}</section>
 }
 function Metric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail?: string }) { return <><div className="metric"><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>{label === 'Nuvens' && <CurrencyPanel />}</> }
