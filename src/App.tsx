@@ -42,7 +42,7 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
   const [items, setItems] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
-  const smartQuery = query === 'noticias jogos games' ? 'noticias jogos games lancamentos Nintendo PlayStation Xbox PC' : query === 'noticias filmes cinema' ? 'noticias filmes cinema streaming Netflix trailers series' : query === 'noticias animes' ? 'noticias animes mangas lancamentos temporada Crunchyroll' : query === 'noticias mundo internacional global' ? 'noticias mundo internacional tecnologia economia ciencia' : query === 'noticias' ? 'noticias prefeitura eventos transito cultura seguranca' : query
+  const smartQuery = query === 'noticias jogos games' ? 'noticias jogos games lancamentos Nintendo PlayStation Xbox PC' : query === 'noticias filmes cinema' ? 'noticias filmes cinema streaming Netflix trailers series' : query === 'noticias animes' ? 'noticias animes mangas lancamentos temporada Crunchyroll' : query === 'noticias mundo internacional global' ? 'noticias' : query === 'noticias' ? 'noticias prefeitura eventos transito cultura seguranca' : query
   useEffect(() => {
     let cancelled = false
     const locationQuery = local && location ? `${location.city} ${location.state}` : ''
