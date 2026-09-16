@@ -45,9 +45,9 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
   const smartQuery = query === 'noticias jogos games' ? 'noticias jogos games lancamentos Nintendo PlayStation Xbox PC' : query === 'noticias filmes cinema' ? 'noticias filmes cinema streaming Netflix trailers series' : query === 'noticias animes' ? 'noticias animes mangas lancamentos temporada Crunchyroll' : query === 'noticias mundo internacional global' ? 'noticias' : query === 'noticias' ? 'noticias prefeitura eventos transito cultura seguranca' : query
   useEffect(() => {
     let cancelled = false
-    const locationQuery = local && location ? `${location.city} ${location.state}` : ''
+    const locationQuery = local && location ? location.city : ''
     if (local && !location) return
-    const searchQuery = `${smartQuery} ${locationQuery} when:7d`
+    const searchQuery = local ? locationQuery : `${smartQuery} when:7d`
     const cacheKey = `hub-news:${searchQuery}`
     const loadNews = async () => {
       const cached = sessionStorage.getItem(cacheKey)
@@ -59,7 +59,7 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
     const timer = window.setInterval(loadNews, NEWS_CACHE_TTL)
     return () => { cancelled = true; window.clearInterval(timer) }
   }, [location, smartQuery, local])
-  const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(`${smartQuery} ${local && location ? `${location.city} ${location.state}` : ''}`)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
+  const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(local && location ? location.city : `${smartQuery} when:7d`)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
   return <section className="news-panel"><div className="news-heading"><div><span className="section-kicker">PORTAL DE NOTÍCIAS</span><h3>{title}</h3></div><a className="news-search" href={searchUrl} target="_blank" rel="noreferrer"><Newspaper size={15} /> Ver todas</a></div>{loading && !items.length ? <div className="news-empty">Buscando notícias...</div> : error && !items.length ? <div className="news-empty">Não foi possível atualizar as notícias agora.</div> : <div className="news-list">{items.map((item) => <a className="news-item" href={item.link} target="_blank" rel="noreferrer" key={item.link}><span><strong>{item.title}</strong><small>{item.author || 'Google News'} · {new Date(item.pubDate).toLocaleDateString('pt-BR')}</small></span><ExternalLink size={14} /></a>)}</div>}</section>
 }
 function Metric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail?: string }) { return <><div className="metric"><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>{label === 'Nuvens' && <CurrencyPanel />}</> }
