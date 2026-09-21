@@ -18,6 +18,8 @@ type CitySuggestion = {
 }
 type WeatherData = { current: Record<string, number | string>; hourly: { time: string[]; temperature_2m: number[]; precipitation_probability: number[]; weather_code: number[] }; daily: { time: string[]; weather_code: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; sunrise: string[]; sunset: string[] } }
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
+const WEATHER_CACHE_TTL = 180000
+const CURRENCY_CACHE_TTL = 60000
 const radarPageUrl = 'https://www.ipmetradar.com.br/2mobileGis.php'
 const radarSources = [
   { label: 'Satélite meteorológico', description: 'Animação de imagens de satélite', url: 'https://www.ipmetradar.com.br/2satelite.php' },
@@ -148,10 +150,26 @@ function CurrencyPanel() {
   const [error, setError] = useState(false)
 
   const loadQuotes = async () => {
+    const cached = sessionStorage.getItem('hub-currency')
+    if (cached) {
+      try {
+        const saved = JSON.parse(cached) as { timestamp: number; quotes: ExchangeData }
+        if (Date.now() - saved.timestamp < CURRENCY_CACHE_TTL) {
+          setQuotes(saved.quotes)
+          setError(false)
+          return
+        }
+      } catch {
+        sessionStorage.removeItem('hub-currency')
+      }
+    }
+
     try {
       const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL')
       if (!response.ok) throw new Error('exchange')
-      setQuotes(await response.json())
+      const nextQuotes = await response.json() as ExchangeData
+      sessionStorage.setItem('hub-currency', JSON.stringify({ timestamp: Date.now(), quotes: nextQuotes }))
+      setQuotes(nextQuotes)
       setError(false)
     } catch {
       setError(true)
@@ -192,6 +210,7 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
     const locationQuery = local && location ? location.city : ''
     if (local && !location) return
 
@@ -216,7 +235,7 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
       setLoading(true)
       try {
         const rss = encodeURIComponent(`https://news.google.com/rss/search?q=${encodeURIComponent(searchQuery)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`)
-        const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rss}`)
+        const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rss}`, { signal: controller.signal })
         if (!response.ok) throw new Error('news')
         const data = await response.json()
         const nextItems = normalizeNewsItems(data.items || [])
@@ -225,16 +244,16 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
           setError(false)
           sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: nextItems }))
         }
-      } catch {
-        if (!cancelled) setError(true)
+      } catch (error) {
+        if (!cancelled && (error as Error).name !== 'AbortError') setError(true)
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
 
-    loadNews()
+    const schedule = window.setTimeout(loadNews, 700)
     const timer = window.setInterval(loadNews, NEWS_CACHE_TTL)
-    return () => { cancelled = true; window.clearInterval(timer) }
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(schedule); window.clearInterval(timer) }
   }, [location, smartQuery, local])
 
   const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(local && location ? location.city : `${smartQuery} when:7d`)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
@@ -282,6 +301,17 @@ function InstallApp() {
   return <button className="install-button" type="button" onClick={async () => { await prompt.prompt(); setPrompt(null) }}><Download size={15} /> Instalar app</button>
 }
 
+function LiveClock() {
+  const [time, setTime] = useState(new Date())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setTime(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  return <div className="clock">{time.toLocaleTimeString('pt-BR')}</div>
+}
+
 async function resetSiteCache() {
   if ('serviceWorker' in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations()
@@ -299,7 +329,7 @@ async function resetSiteCache() {
 }
 
 function App() {
-  const [now, setNow] = useState(new Date())
+  const [now] = useState(new Date())
   const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(null)
   const [location, setLocation] = useState<LocationInfo | null>(null)
   const [locationError, setLocationError] = useState('')
@@ -448,7 +478,6 @@ function App() {
     loadCurrentLocation()
   }
 
-  useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(timer) }, [])
   useEffect(() => { const root = document.querySelector<HTMLElement>('.app-shell'); if (root) normalizeVisibleEscapes(root) }, [])
   useEffect(() => { loadCurrentLocation() }, [])
 
@@ -465,9 +494,23 @@ function App() {
         hourly: 'temperature_2m,precipitation_probability,weather_code',
         daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset',
       })
+      const cacheKey = `hub-weather:${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        const saved = JSON.parse(cached) as { timestamp: number; weather: WeatherData }
+        if (Date.now() - saved.timestamp < WEATHER_CACHE_TTL) {
+          setWeather(saved.weather)
+          setLastUpdated(new Date(saved.timestamp))
+          setLoadingWeather(false)
+          return
+        }
+      }
+
       const response = await fetch(`${weatherUrl}?${params}`)
       if (!response.ok) throw new Error('weather')
-      setWeather(await response.json())
+      const nextWeather = await response.json() as WeatherData
+      sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), weather: nextWeather }))
+      setWeather(nextWeather)
       setLastUpdated(new Date())
     } catch {
       setWeatherError('Não foi possível atualizar os dados meteorológicos. Tentaremos novamente automaticamente.')
@@ -499,7 +542,7 @@ function App() {
         <div className="eyebrow"><span className="live-dot" /> PAINEL PESSOAL DE INFORMAÇÕES</div>
         <h1>Hub Principal</h1>
         <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
-        <div className="clock">{now.toLocaleTimeString('pt-BR')}</div>
+        <LiveClock />
         <p className="timezone">Horário local do seu dispositivo</p>
         <InstallApp />
       </header>
