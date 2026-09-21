@@ -60,6 +60,11 @@ h2 { color: #e6f8ff; font-family: 'Courier New', monospace; letter-spacing: .02e
 .location-modal-label { color: #9db8c7; display: block; font-size: 12px; letter-spacing: .08em; margin-bottom: 8px; text-transform: uppercase; }
 .location-modal-input { background: rgba(67, 232, 255, .04); border: 1px solid rgba(67, 232, 255, .25); border-radius: 8px; color: #eafcff; padding: 12px 14px; width: 100%; }
 .location-modal-input:focus { outline: 2px solid rgba(67, 232, 255, .3); }
+.city-suggestions { display: grid; gap: 8px; margin-top: 10px; }
+.city-suggestion-item { align-items: center; background: rgba(67, 232, 255, .03); border: 1px solid rgba(67, 232, 255, .18); border-radius: 8px; color: #eafcff; cursor: pointer; display: flex; gap: 8px; padding: 10px 12px; text-align: left; transition: border-color .2s, background .2s; }
+.city-suggestion-item:hover { background: rgba(67, 232, 255, .08); border-color: rgba(67, 232, 255, .4); }
+.city-suggestion-item svg { color: var(--teal); }
+.city-suggestion-item span { flex: 1; }
 .location-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
 .location-modal-secondary, .location-modal-primary { border-radius: 8px; cursor: pointer; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: .08em; padding: 10px 14px; text-transform: uppercase; }
 .location-modal-secondary { background: transparent; border: 1px solid rgba(67, 232, 255, .25); color: var(--teal); }
