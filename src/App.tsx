@@ -282,6 +282,22 @@ function InstallApp() {
   return <button className="install-button" type="button" onClick={async () => { await prompt.prompt(); setPrompt(null) }}><Download size={15} /> Instalar app</button>
 }
 
+async function resetSiteCache() {
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    await Promise.all(registrations.map((registration) => registration.unregister()))
+  }
+
+  if ('caches' in window) {
+    const cacheNames = await caches.keys()
+    await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
+  }
+
+  localStorage.clear()
+  sessionStorage.clear()
+  window.location.reload()
+}
+
 function App() {
   const [now, setNow] = useState(new Date())
   const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(null)
@@ -477,6 +493,9 @@ function App() {
   return (
     <main className="app-shell notranslate" translate="no">
       <header className="hero-header">
+        <button className="cache-reset-button" type="button" title="Limpar cache e atualizar site" aria-label="Limpar cache e atualizar site" onClick={resetSiteCache}>
+          <RefreshCw size={17} />
+        </button>
         <div className="eyebrow"><span className="live-dot" /> PAINEL PESSOAL DE INFORMAÇÕES</div>
         <h1>Hub Principal</h1>
         <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
