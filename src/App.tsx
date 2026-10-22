@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Navigation, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind } from 'lucide-react'
+import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Monitor, Navigation, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
 import './App.css'
 import CurrencyPanel from './CurrencyPanel'
 import NewsPanel from './NewsPanel'
@@ -224,6 +224,7 @@ function App() {
   const [siteResetError, setSiteResetError] = useState('')
   const [favoriteLocations, setFavoriteLocations] = useState<FavoriteLocationsState>(readFavoriteLocations)
   const [isCityModalOpen, setIsCityModalOpen] = useState(false)
+  const [isTvMode, setIsTvMode] = useState(false)
   const [cityQuery, setCityQuery] = useState('')
   const [cityLookupError, setCityLookupError] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
@@ -234,6 +235,11 @@ function App() {
     const timer = window.setInterval(() => setNow(new Date()), 60000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    document.body.classList.toggle('tv-mode-active', isTvMode)
+    return () => document.body.classList.remove('tv-mode-active')
+  }, [isTvMode])
 
   const resetSiteData = async () => {
     if (!window.confirm('Isso apagará os dados salvos, incluindo cidades favoritas, e atualizará o site. Deseja continuar?')) return
@@ -512,11 +518,20 @@ function App() {
   const isUsingCustomLocation = currentLocation && location ? (Math.abs(location.latitude - currentLocation.latitude) > 0.01 || Math.abs(location.longitude - currentLocation.longitude) > 0.01) : false
 
   return (
-    <main className="app-shell notranslate" translate="no">
+    <main className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}`} translate="no">
       <header className="hero-header">
         <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
           <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
           <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
+        </button>
+        <button
+          className="tv-mode-button"
+          type="button"
+          onClick={() => setIsTvMode((enabled) => !enabled)}
+          aria-pressed={isTvMode}
+        >
+          {isTvMode ? <X size={16} /> : <Monitor size={16} />}
+          {isTvMode ? 'Sair do modo TV' : 'Modo TV'}
         </button>
         <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
         <LiveClock />
@@ -584,6 +599,12 @@ function App() {
                   <div className="condition">{weatherLabels[currentCode] || 'Condição atual'}</div>
                 </div>
                 <div className="feels">Sensação<br /><strong>{formatNumber(current?.apparent_temperature, '°')}C</strong></div>
+              </div>
+
+              <div className="tv-weather-rain">
+                <CloudRain size={21} />
+                <span>Maior chance de chuva hoje</span>
+                <strong>{formatNumber(highestRainChanceToday?.probability, '%')}</strong>
               </div>
 
               <div className="metric-grid">

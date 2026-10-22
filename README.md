@@ -4,6 +4,8 @@ Dashboard pessoal de clima, previsão, cotações, imagens animadas de satélite
 
 Quando fica aberto, o painel atualiza os dados a cada 30 minutos sem recarregar a página ou alterar a posição de rolagem. Se a aba estiver suspensa, a atualização acontece ao voltar a ficar visível.
 
+O modo TV organiza o clima e as imagens do satélite lado a lado. A animação do satélite pausa quando a aba ou o painel não estão visíveis e continua ao retornar.
+
 ## Rodar localmente
 
 ```powershell

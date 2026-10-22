@@ -342,6 +342,8 @@ Esse conjunto permite que o site seja "instalável" e tenha aparência de app na
 
 O app emite um evento de atualização de dados a cada 30 minutos, sem recarregar a página nem alterar a posição de rolagem. Os painéis atualizam clima, cotações, notícias e imagens do satélite; se a aba ficar suspensa pelo navegador, a atualização acontece quando ela volta a ficar visível. Atualizações do Service Worker também não forçam recarga da página aberta.
 
+O modo TV, ativado pelo botão no cabeçalho, mostra o clima atual e o satélite lado a lado, ocultando notícias e atalhos para aproveitar a tela. A animação do satélite pausa quando o navegador está em outra aba ou quando o painel sai da área visível e continua ao retornar. Clima e satélite mostram discretamente o horário da atualização; falhas nas fontes continuam sinalizadas nos respectivos painéis.
+
 ---
 
 ## 11. Regras de segurança e limitações

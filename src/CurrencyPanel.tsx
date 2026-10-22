@@ -74,6 +74,7 @@ export default function CurrencyPanel() {
           ))}
         </div>
       )}
+      {error && quotes && <small className="currency-stale-error" role="status">Cotações indisponíveis; mostrando os valores da última coleta.</small>}
       {quotes && <small className="currency-updated">Compra de referência · última coleta: {new Date(quotes.USDBRL.create_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>}
     </section>
   )

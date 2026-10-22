@@ -25,6 +25,7 @@ body {
 button, input { font: inherit; }
 button { color: inherit; }
 #root { min-height: 100vh; }
+body.tv-mode-active { overflow: hidden; }
 
 .app-shell { margin: 0 auto; max-width: 1240px; padding: 0 28px 36px; }
 .hero-header {
@@ -63,6 +64,13 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 }
 .cache-reset-button:hover:not(:disabled) { background: var(--surface-raised); border-color: rgba(99, 214, 207, .45); color: var(--teal-dark); }
 .cache-reset-button:disabled { cursor: progress; opacity: .7; }
+.tv-mode-button {
+  align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink); cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 650;
+  gap: 7px; left: 0; padding: 9px 12px; position: absolute; top: 14px;
+}
+.tv-mode-button:hover { border-color: var(--teal); color: var(--teal-dark); }
+.tv-mode-button svg { color: var(--teal); }
 .cache-reset-button:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .site-reset-error { color: #ffb0b0; font-size: 12px; margin: 14px auto 0; max-width: 520px; }
 
@@ -105,6 +113,7 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .notice.error { background: rgba(255, 143, 143, .09); color: #ffb3b3; }
 
 .current-weather { align-items: center; display: flex; gap: 17px; margin: 4px 0 22px; }
+.tv-weather-rain { display: none; }
 .weather-symbol { align-items: center; background: rgba(244, 201, 107, .1); border: 1px solid rgba(244, 201, 107, .12); border-radius: 18px; color: #f4c96b; display: flex; flex: 0 0 auto; height: 68px; justify-content: center; width: 68px; }
 .temperature { color: var(--ink); font-size: 48px; font-weight: 580; letter-spacing: -.065em; line-height: 1; }
 .temperature span { font-size: 20px; font-weight: 500; letter-spacing: 0; margin-left: 2px; }
@@ -140,6 +149,7 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .positive { color: #8be8b1; font-size: 12px; font-weight: 600; }
 .negative { color: #ffadb2; font-size: 12px; font-weight: 600; }
 .currency-updated { color: var(--muted); display: block; font-size: 10px; margin-top: 8px; }
+.currency-stale-error { color: #ffaaaa; display: block; font-size: 10px; margin-top: 7px; }
 .currency-error { background: rgba(255, 143, 143, .08); border: 1px solid rgba(255, 143, 143, .2); color: #ffb3b3; font-size: 11px; padding: 10px; }
 
 .hourly-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -194,6 +204,62 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .satellite-attribution a:hover { text-decoration: underline; }
 .satellite-panel:fullscreen .satellite-viewer { height: calc(100vh - 260px); }
 .satellite-panel:fullscreen .satellite-image { height: 100%; }
+.tv-mode.app-shell {
+  display: grid; gap: 12px; grid-template-columns: minmax(300px, .78fr) minmax(0, 1.22fr);
+  grid-template-rows: 72px minmax(0, 1fr); height: 100vh; height: 100dvh; max-width: none;
+  overflow: hidden; padding: 10px 14px;
+}
+.tv-mode .hero-header {
+  align-items: center; border-bottom: 1px solid var(--line); display: grid; gap: 8px 18px;
+  grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto auto; grid-row: 1;
+  min-height: 0; padding: 0 8px; text-align: left;
+}
+.tv-mode .cache-reset-button, .tv-mode .timezone, .tv-mode .auto-refresh-note, .tv-mode .install-button { display: none; }
+.tv-mode .date-line { font-size: clamp(14px, 1.5vw, 19px); grid-column: 1; grid-row: 1; justify-content: flex-start; }
+.tv-mode .clock { font-size: clamp(28px, 3vw, 42px); grid-column: 2; grid-row: 1; margin: 0; }
+.tv-mode .tv-mode-button { grid-column: 3; grid-row: 1; position: static; }
+.tv-mode .content-grid { display: contents; }
+.tv-mode .weather-panel {
+  grid-column: 1; grid-row: 2; height: 100%; margin: 0; min-height: 0; overflow: auto; padding: 20px;
+}
+.tv-mode .forecast-panel { display: none; }
+.tv-mode .weather-panel > .section-heading { margin-bottom: 8px; }
+.tv-mode .weather-panel > .section-heading .section-kicker, .tv-mode .weather-header-actions { display: none; }
+.tv-mode .weather-panel > .section-heading h2 { font-size: clamp(22px, 2vw, 28px); }
+.tv-mode .weather-updated { font-size: 10px; margin: 0 0 12px; }
+.tv-mode .location-line { font-size: clamp(17px, 1.7vw, 22px); margin-bottom: 20px; }
+.tv-mode .location-status, .tv-mode .favorite-toggle { display: none; }
+.tv-mode .current-weather { gap: 20px; margin-bottom: 14px; }
+.tv-mode .weather-symbol { height: 76px; width: 76px; }
+.tv-mode .temperature { font-size: clamp(56px, 6vw, 76px); }
+.tv-mode .condition { font-size: 16px; }
+.tv-mode .feels { font-size: 13px; }
+.tv-mode .feels strong { font-size: 18px; }
+.tv-mode .tv-weather-rain {
+  align-items: center; background: rgba(255, 50, 65, .12); border: 1px solid rgba(255, 77, 90, .25);
+  border-radius: 8px; color: #ff777f; display: flex; font-size: 12px; gap: 8px; margin-bottom: 14px; padding: 10px 12px;
+}
+.tv-mode .tv-weather-rain span { color: var(--ink); }
+.tv-mode .tv-weather-rain strong { font-size: 19px; margin-left: auto; }
+.tv-mode .metric-grid { gap: 2px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tv-mode .metric:nth-child(n+5):nth-child(-n+8) { display: none; }
+.tv-mode .metric { min-height: 68px; }
+.tv-mode .metric-icon svg { height: 23px; width: 23px; }
+.tv-mode .metric small { font-size: 12px; }
+.tv-mode .metric strong { font-size: 16px; }
+.tv-mode .currency-panel { display: none; }
+.tv-mode .satellite-panel {
+  display: grid; gap: 0; grid-column: 2; grid-row: 2; grid-template-rows: auto minmax(0, 1fr) auto auto;
+  height: 100%; margin: 0; min-height: 0; overflow: hidden; padding: 16px;
+}
+.tv-mode .satellite-panel .section-heading { margin-bottom: 10px; }
+.tv-mode .satellite-panel .section-heading h2 { font-size: clamp(19px, 1.8vw, 26px); }
+.tv-mode .satellite-viewer { height: 100%; min-height: 0; }
+.tv-mode .satellite-image { height: 100%; max-height: none; }
+.tv-mode .satellite-controls { margin-top: 8px; }
+.tv-mode .satellite-timeline { margin: 7px 0 0; }
+.tv-mode .satellite-attribution { font-size: 10px; margin-top: 4px; }
+.tv-mode > .radar-links-panel, .tv-mode > .news-portals, .tv-mode > .useful-sites, .tv-mode > footer { display: none; }
 
 .news-portals { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
 .news-panel { contain: layout paint; padding: 19px; }
@@ -265,9 +331,17 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .forecast-panel { order: 1; }
 }
 @media (max-width: 800px) {
+  body.tv-mode-active { overflow: auto; }
   .app-shell { padding: 0 18px 28px; }
   .hero-header { padding: 54px 6px 27px; }
   .cache-reset-button { right: 0; top: 11px; }
+  .tv-mode.app-shell { gap: 10px; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto; height: auto; min-height: 100dvh; overflow: visible; padding: 10px 18px 20px; }
+  .tv-mode .hero-header { grid-column: 1; grid-template-columns: minmax(0, 1fr) auto; grid-row: 1; min-height: 64px; }
+  .tv-mode .date-line { font-size: 13px; grid-column: 1; }
+  .tv-mode .clock { font-size: 24px; grid-column: 2; }
+  .tv-mode .tv-mode-button { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+  .tv-mode .weather-panel { grid-column: 1; grid-row: 3; height: auto; max-height: none; }
+  .tv-mode .satellite-panel { grid-column: 1; grid-row: 4; height: 72dvh; min-height: 320px; }
   .panel, .useful-sites { padding: 20px; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric:not(:nth-child(3n+1)) { border-left: 0; padding-left: 0; }
@@ -285,6 +359,12 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .date-line svg { height: 17px; width: 17px; }
   .clock { font-size: 36px; }
   .cache-reset-button { font-size: 11px; padding: 8px 9px; }
+  .tv-mode.app-shell { padding: 10px 12px 18px; }
+  .tv-mode .hero-header { gap: 6px; padding: 4px; }
+  .tv-mode .date-line { font-size: 11px; }
+  .tv-mode .clock { font-size: 20px; }
+  .tv-mode .weather-panel { padding: 17px 14px; }
+  .tv-mode .satellite-panel { padding: 14px; }
   .content-grid { gap: 12px; margin-top: 14px; }
   .panel, .useful-sites { border-radius: 10px; padding: 17px 14px; }
   .section-heading { gap: 8px; margin-bottom: 15px; }

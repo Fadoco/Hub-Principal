@@ -98,11 +98,32 @@ export default function SatellitePanel() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [prefetchedKey, setPrefetchedKey] = useState('')
   const [prefetchRetry, setPrefetchRetry] = useState(0)
+  const [isPanelVisible, setIsPanelVisible] = useState(false)
+  const [isDocumentVisible, setIsDocumentVisible] = useState(() => document.visibilityState === 'visible')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const panelRef = useRef<HTMLElement | null>(null)
   const frameCache = useRef(new Map<string, CachedFrame>())
   const inFlightFrames = useRef(new Map<string, Promise<CachedFrame>>())
   const frameRequestQueue = useRef(Promise.resolve())
   const visibleHours = useMemo(() => [...hours].reverse(), [hours])
+  const isActive = isPanelVisible && isDocumentVisible
+
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!panel || !('IntersectionObserver' in window)) {
+      setIsPanelVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(([entry]) => setIsPanelVisible(entry.isIntersecting), { rootMargin: '80px' })
+    observer.observe(panel)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const updateVisibility = () => setIsDocumentVisible(document.visibilityState === 'visible')
+    document.addEventListener('visibilitychange', updateVisibility)
+    return () => document.removeEventListener('visibilitychange', updateVisibility)
+  }, [])
 
   useEffect(() => {
     const refreshSatellite = () => setRefreshKey((key) => key + 1)
@@ -182,6 +203,7 @@ export default function SatellitePanel() {
       .then((loadedFrame) => {
         if (!disposed) {
           setFrame(loadedFrame)
+          setLastUpdated(new Date())
           setIsLoading(false)
         }
       })
@@ -197,7 +219,7 @@ export default function SatellitePanel() {
   }, [selectedDate, selectedHour])
 
   useEffect(() => {
-    if (!selectedDate || !selectedHour || visibleHours.length < 2) return
+    if (!isActive || !selectedDate || !selectedHour || visibleHours.length < 2) return
     const currentIndex = visibleHours.indexOf(selectedHour)
     const nextHour = visibleHours[(currentIndex + 1) % visibleHours.length]
     const nextKey = `${selectedDate}/${nextHour}`
@@ -222,10 +244,10 @@ export default function SatellitePanel() {
       disposed = true
       window.clearTimeout(retryTimer)
     }
-  }, [prefetchRetry, selectedDate, selectedHour, visibleHours])
+  }, [isActive, prefetchRetry, selectedDate, selectedHour, visibleHours])
 
   useEffect(() => {
-    if (!isPlaying || error || visibleHours.length < 2 || !selectedHour) return
+    if (!isActive || !isPlaying || error || visibleHours.length < 2 || !selectedHour) return
     const currentIndex = visibleHours.indexOf(selectedHour)
     const nextHour = visibleHours[(currentIndex + 1) % visibleHours.length]
     const nextKey = `${selectedDate}/${nextHour}`
@@ -234,7 +256,7 @@ export default function SatellitePanel() {
       setSelectedHour(nextHour)
     }, ANIMATION_INTERVAL)
     return () => window.clearTimeout(animationTimer)
-  }, [error, isPlaying, prefetchedKey, selectedDate, selectedHour, visibleHours])
+  }, [error, isActive, isPlaying, prefetchedKey, selectedDate, selectedHour, visibleHours])
 
   const toggleFullscreen = async () => {
     const panel = panelRef.current
@@ -305,7 +327,7 @@ export default function SatellitePanel() {
       )}
 
       <div className="satellite-attribution">
-        <span>Imagens GOES · Fonte: INMET</span>
+        <span>INMET · {lastUpdated ? `Atualizado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Imagens GOES'}</span>
         <a href="https://satelite.inmet.gov.br/" target="_blank" rel="noopener noreferrer">Portal oficial do INMET</a>
       </div>
     </section>
