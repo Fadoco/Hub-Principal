@@ -348,6 +348,8 @@ O projeto registra um Service Worker em `public/sw.js`.
 
 Esse conjunto permite que o site seja "instalável" e tenha aparência de app nativo em alguns navegadores.
 
+Além da verificação de atualização do Service Worker, o app recarrega a página após 30 minutos para buscar uma versão nova e atualizar todos os painéis. Se a aba ficar suspensa pelo navegador, a atualização acontece quando ela volta a ficar visível.
+
 ---
 
 ## 11. Regras de segurança e limitações

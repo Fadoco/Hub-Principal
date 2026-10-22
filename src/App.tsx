@@ -541,6 +541,7 @@ function App() {
         <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
         <LiveClock />
         <p className="timezone">Horário local do seu dispositivo</p>
+        <p className="auto-refresh-note">Atualização automática a cada 30 minutos</p>
         <InstallApp />
         {siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
       </header>

@@ -2,6 +2,8 @@
 
 Dashboard pessoal de clima, previsão, cotações, mapa, notícias por categoria e links úteis.
 
+Quando fica aberto, o painel recarrega automaticamente a cada 30 minutos para buscar a versão e os dados mais recentes. Se a aba estiver suspensa, ele recarrega ao voltar a ficar visível.
+
 ## Rodar localmente
 
 ```powershell

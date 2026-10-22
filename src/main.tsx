@@ -3,6 +3,18 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+const FULL_SITE_REFRESH_INTERVAL_MS = 30 * 60 * 1000
+const nextFullSiteRefresh = Date.now() + FULL_SITE_REFRESH_INTERVAL_MS
+const refreshSiteIfDue = () => {
+  if (Date.now() >= nextFullSiteRefresh && document.visibilityState === 'visible') {
+    window.location.reload()
+  }
+}
+
+window.setTimeout(refreshSiteIfDue, FULL_SITE_REFRESH_INTERVAL_MS)
+document.addEventListener('visibilitychange', refreshSiteIfDue)
+window.addEventListener('pageshow', refreshSiteIfDue)
+
 const currentUrl = new URL(window.location.href)
 if (currentUrl.searchParams.has('_refresh')) {
   currentUrl.searchParams.delete('_refresh')

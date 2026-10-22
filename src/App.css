@@ -47,6 +47,7 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .date-line { align-items: center; color: var(--muted); display: flex; font-size: 13px; gap: 7px; justify-content: center; text-transform: capitalize; }
 .clock { color: var(--teal-dark); font-size: 28px; font-variant-numeric: tabular-nums; font-weight: 550; letter-spacing: .035em; margin-top: 11px; }
 .timezone { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.auto-refresh-note { color: var(--muted); font-size: 10px; margin-top: 6px; }
 .install-button {
   align-items: center; background: rgba(99, 214, 207, .08); border: 1px solid rgba(99, 214, 207, .3);
   border-radius: 7px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 11px;
