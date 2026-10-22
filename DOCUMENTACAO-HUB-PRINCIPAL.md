@@ -270,7 +270,7 @@ Se disponível, o botão aparece e permite instalar a página como app.
 
 ## 7. Mapa da localização
 
-O mapa usa Leaflet e os tiles do OpenStreetMap para mostrar a localização selecionada. O radar IPMet foi removido porque o site bloqueia a incorporação e a área não apresentava informação útil.
+O mapa usa Leaflet e os tiles do OpenStreetMap para mostrar a localização selecionada. A seção “Radares e satélites” oferece links externos para as páginas oficiais do IPMet/Unesp. Os radares não são incorporados nem apresentados como uma transmissão ao vivo dentro do Hub.
 
 ---
 

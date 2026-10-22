@@ -22,6 +22,12 @@ type WeatherData = { current: Record<string, number | string>; hourly: { time: s
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const WEATHER_CACHE_TTL = 180000
 const FAVORITE_LOCATIONS_KEY = 'hub-favorite-locations'
+const radarSources = [
+  { label: 'Satélite meteorológico', description: 'Imagens e animação de satélite', url: 'https://www.ipmetradar.com.br/2satelite.php' },
+  { label: 'Radar animado PPI', description: 'Animação das últimas imagens do radar', url: 'https://www.ipmetradar.com.br/2animRadar.php' },
+  { label: 'Radar GIS Local', description: 'Radar GIS e cidades', url: 'https://www.ipmetradar.com.br/2mobileGis.php' },
+  { label: 'Radar GIS satélite', description: 'Mapa GIS com imagens de satélite', url: 'https://www.ipmetradar.com.br/2satGis.php' },
+]
 const usefulSites = [
   { label: 'Remover fundo', description: 'Remova fundos de imagens', url: 'https://www.photoroom.com/pt-br/tools/background-remover' },
   { label: 'Gerenciador de PDF', description: 'Editar e organizar PDFs', url: 'https://www.ilovepdf.com/' },
@@ -698,6 +704,20 @@ function App() {
             <div className="map-placeholder"><Compass size={28} /><span>O mapa será centralizado<br />quando sua localização estiver disponível.</span></div>
           </div>
         )}
+      </section>
+
+      <section className="radar-links-panel">
+        <div className="useful-heading">
+          <div><span className="section-kicker">FONTES OFICIAIS · IPMET / UNESP</span><h2>Radares e satélites</h2></div>
+        </div>
+        <div className="radar-links-grid">
+          {radarSources.map((source) => (
+            <a className="radar-link-card" href={source.url} target="_blank" rel="noopener noreferrer" key={source.url}>
+              <span><strong>{source.label}</strong><small>{source.description}</small></span>
+              <ExternalLink size={16} />
+            </a>
+          ))}
+        </div>
       </section>
 
       <div className="news-portals">
