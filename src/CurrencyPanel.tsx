@@ -8,9 +8,9 @@ export default function CurrencyPanel() {
   const [quotes, setQuotes] = useState<ExchangeData | null>(null)
   const [error, setError] = useState(false)
 
-  const loadQuotes = async () => {
+  const loadQuotes = async (forceRefresh = false) => {
     const cached = sessionStorage.getItem('hub-currency')
-    if (cached) {
+    if (!forceRefresh && cached) {
       try {
         const saved = JSON.parse(cached) as { timestamp: number; quotes: ExchangeData }
         if (Date.now() - saved.timestamp < CURRENCY_CACHE_TTL) {
@@ -38,9 +38,12 @@ export default function CurrencyPanel() {
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadQuotes(), 0)
     const timer = window.setInterval(() => void loadQuotes(), CURRENCY_CACHE_TTL)
+    const refreshQuotes = () => void loadQuotes(true)
+    window.addEventListener('hub:data-refresh', refreshQuotes)
     return () => {
       window.clearTimeout(initialLoad)
       window.clearInterval(timer)
+      window.removeEventListener('hub:data-refresh', refreshQuotes)
     }
   }, [])
 

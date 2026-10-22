@@ -2,7 +2,7 @@
 
 Dashboard pessoal de clima, previsão, cotações, imagens animadas de satélite, notícias por categoria e links úteis.
 
-Quando fica aberto, o painel recarrega automaticamente a cada 30 minutos para buscar a versão e os dados mais recentes. Se a aba estiver suspensa, ele recarrega ao voltar a ficar visível.
+Quando fica aberto, o painel atualiza os dados a cada 30 minutos sem recarregar a página ou alterar a posição de rolagem. Se a aba estiver suspensa, a atualização acontece ao voltar a ficar visível.
 
 ## Rodar localmente
 

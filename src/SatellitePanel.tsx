@@ -9,19 +9,23 @@ type CachedFrame = SatelliteFrame & { date: string }
 const API_URL = 'https://apisat.inmet.gov.br'
 const PARAMETER = 'TN'
 const FRAME_CACHE_LIMIT = 12
-const PREFETCH_COUNT = 3
-const ANIMATION_INTERVAL = 500
+const ANIMATION_INTERVAL = 900
 
 async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { signal, cache: 'no-store' })
   if (!response.ok) throw new Error(`O INMET respondeu com o status ${response.status}.`)
-  return response.json() as Promise<T>
+  const body = await response.text()
+  try {
+    return JSON.parse(body) as T
+  } catch {
+    throw new Error('O serviço do INMET retornou uma resposta inválida. Tente atualizar em instantes.')
+  }
 }
 
-async function loadFrame(date: string, hour: string, signal: AbortSignal): Promise<CachedFrame> {
+async function fetchFrame(date: string, hour: string): Promise<CachedFrame> {
   const result = await getJson<SatelliteFrame>(
     `/GOES/BR/${PARAMETER}/${date}/${encodeURIComponent(hour)}`,
-    signal,
+    new AbortController().signal,
   )
   if (typeof result.base64 !== 'string' || !result.base64.startsWith('data:image/')) {
     throw new Error(`O INMET retornou uma imagem inválida para ${hour}.`)
@@ -33,6 +37,56 @@ async function loadFrame(date: string, hour: string, signal: AbortSignal): Promi
   return { ...result, date }
 }
 
+function getFrame(
+  date: string,
+  hour: string,
+  cache: Map<string, CachedFrame>,
+  inFlight: Map<string, Promise<CachedFrame>>,
+  requestQueue: { current: Promise<void> },
+): Promise<CachedFrame> {
+  const key = `${date}/${hour}`
+  const cachedFrame = cache.get(key)
+  if (cachedFrame) return Promise.resolve(cachedFrame)
+  const pendingRequest = inFlight.get(key)
+  if (pendingRequest) return pendingRequest
+
+  const request = requestQueue.current.then(async () => {
+    const queuedCacheHit = cache.get(key)
+    if (queuedCacheHit) return queuedCacheHit
+
+    let result: CachedFrame | null = null
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        result = await fetchFrame(date, hour)
+        break
+      } catch (requestError) {
+        if (attempt === 2) {
+          throw requestError instanceof Error
+            ? requestError
+            : new Error('Não foi possível carregar a imagem do satélite.')
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)))
+      }
+    }
+
+    if (!result) throw new Error('Não foi possível carregar a imagem do satélite.')
+    cache.set(key, result)
+    while (cache.size > FRAME_CACHE_LIMIT) {
+      const oldestKey = cache.keys().next().value
+      if (!oldestKey) break
+      cache.delete(oldestKey)
+    }
+    return result
+  })
+  requestQueue.current = request.then(() => undefined, () => undefined)
+  inFlight.set(key, request)
+  void request.then(
+    () => inFlight.delete(key),
+    () => inFlight.delete(key),
+  )
+  return request
+}
+
 export default function SatellitePanel() {
   const [selectedDate, setSelectedDate] = useState('')
   const [hours, setHours] = useState<string[]>([])
@@ -42,9 +96,19 @@ export default function SatellitePanel() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [prefetchedKey, setPrefetchedKey] = useState('')
+  const [prefetchRetry, setPrefetchRetry] = useState(0)
   const panelRef = useRef<HTMLElement | null>(null)
   const frameCache = useRef(new Map<string, CachedFrame>())
+  const inFlightFrames = useRef(new Map<string, Promise<CachedFrame>>())
+  const frameRequestQueue = useRef(Promise.resolve())
   const visibleHours = useMemo(() => [...hours].reverse(), [hours])
+
+  useEffect(() => {
+    const refreshSatellite = () => setRefreshKey((key) => key + 1)
+    window.addEventListener('hub:data-refresh', refreshSatellite)
+    return () => window.removeEventListener('hub:data-refresh', refreshSatellite)
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -111,84 +175,66 @@ export default function SatellitePanel() {
   useEffect(() => {
     if (!selectedDate || !selectedHour) return
     const cacheKey = `${selectedDate}/${selectedHour}`
-    const cachedFrame = frameCache.current.get(cacheKey)
-    if (cachedFrame) {
-      setFrame(cachedFrame)
-      setIsLoading(false)
-      setError('')
-      return
-    }
-
-    const controller = new AbortController()
     let disposed = false
-    setIsLoading(true)
+    setIsLoading(!frameCache.current.has(cacheKey))
     setError('')
-
-    const loadSelectedFrame = async () => {
-      try {
-        const cachedResult = await loadFrame(selectedDate, selectedHour, controller.signal)
-
+    void getFrame(selectedDate, selectedHour, frameCache.current, inFlightFrames.current, frameRequestQueue)
+      .then((loadedFrame) => {
         if (!disposed) {
-          frameCache.current.set(cacheKey, cachedResult)
-          if (frameCache.current.size > FRAME_CACHE_LIMIT) {
-            const oldestKey = frameCache.current.keys().next().value
-            if (oldestKey) frameCache.current.delete(oldestKey)
-          }
-          setFrame(cachedResult)
+          setFrame(loadedFrame)
+          setIsLoading(false)
         }
-      } catch (loadError) {
-        if (!disposed && !(loadError instanceof DOMException && loadError.name === 'AbortError')) {
+      })
+      .catch((loadError: unknown) => {
+        if (!disposed) {
           setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a imagem do satélite.')
+          setIsLoading(false)
         }
-      } finally {
-        if (!disposed) setIsLoading(false)
-      }
-    }
-
-    void loadSelectedFrame()
+      })
     return () => {
       disposed = true
-      controller.abort()
     }
   }, [selectedDate, selectedHour])
 
   useEffect(() => {
     if (!selectedDate || !selectedHour || visibleHours.length < 2) return
-    const controller = new AbortController()
     const currentIndex = visibleHours.indexOf(selectedHour)
-    const upcomingHours = Array.from({ length: PREFETCH_COUNT }, (_, offset) => (
-      visibleHours[(currentIndex + offset + 1) % visibleHours.length]
-    ))
-
-    const prefetch = async () => {
-      await Promise.all(upcomingHours.map(async (hour) => {
-        const cacheKey = `${selectedDate}/${hour}`
-        if (frameCache.current.has(cacheKey)) return
-        const upcomingFrame = await loadFrame(selectedDate, hour, controller.signal)
-        frameCache.current.set(cacheKey, upcomingFrame)
-        if (frameCache.current.size > FRAME_CACHE_LIMIT) {
-          const oldestKey = frameCache.current.keys().next().value
-          if (oldestKey) frameCache.current.delete(oldestKey)
-        }
-      }))
+    const nextHour = visibleHours[(currentIndex + 1) % visibleHours.length]
+    const nextKey = `${selectedDate}/${nextHour}`
+    let disposed = false
+    let retryTimer = 0
+    if (frameCache.current.has(nextKey)) {
+      setPrefetchedKey(nextKey)
+      return
     }
 
-    void prefetch().catch((prefetchError: unknown) => {
-      if (!(prefetchError instanceof DOMException && prefetchError.name === 'AbortError')) {
-        console.error('Falha ao pré-carregar imagens do satélite.', prefetchError)
-      }
-    })
-    return () => controller.abort()
-  }, [selectedDate, selectedHour, visibleHours])
+    void getFrame(selectedDate, nextHour, frameCache.current, inFlightFrames.current, frameRequestQueue)
+      .then(() => {
+        if (!disposed) setPrefetchedKey(nextKey)
+      })
+      .catch((prefetchError: unknown) => {
+        if (!disposed) {
+          console.warn('Não foi possível pré-carregar a próxima imagem de satélite.', prefetchError)
+          retryTimer = window.setTimeout(() => setPrefetchRetry((attempt) => attempt + 1), 5000)
+        }
+      })
+    return () => {
+      disposed = true
+      window.clearTimeout(retryTimer)
+    }
+  }, [prefetchRetry, selectedDate, selectedHour, visibleHours])
 
   useEffect(() => {
-    if (!isPlaying || isLoading || error || visibleHours.length < 2 || !selectedHour) return
+    if (!isPlaying || error || visibleHours.length < 2 || !selectedHour) return
+    const currentIndex = visibleHours.indexOf(selectedHour)
+    const nextHour = visibleHours[(currentIndex + 1) % visibleHours.length]
+    const nextKey = `${selectedDate}/${nextHour}`
+    if (prefetchedKey !== nextKey || !frameCache.current.has(nextKey)) return
     const animationTimer = window.setTimeout(() => {
-      const activeIndex = visibleHours.indexOf(selectedHour)
-      setSelectedHour(visibleHours[(activeIndex + 1) % visibleHours.length])
+      setSelectedHour(nextHour)
     }, ANIMATION_INTERVAL)
     return () => window.clearTimeout(animationTimer)
-  }, [error, isLoading, isPlaying, selectedHour, visibleHours])
+  }, [error, isPlaying, prefetchedKey, selectedDate, selectedHour, visibleHours])
 
   const toggleFullscreen = async () => {
     const panel = panelRef.current

@@ -212,7 +212,7 @@ function LiveClock() {
 }
 
 function App() {
-  const [now] = useState(new Date())
+  const [now, setNow] = useState(new Date())
   const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(null)
   const [location, setLocation] = useState<LocationInfo | null>(null)
   const [locationError, setLocationError] = useState('')
@@ -229,6 +229,11 @@ function App() {
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [selectedCitySuggestion, setSelectedCitySuggestion] = useState<CitySuggestion | null>(null)
   const isCurrentLocationFavorite = Boolean(location && favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(location)))
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const resetSiteData = async () => {
     if (!window.confirm('Isso apagará os dados salvos, incluindo cidades favoritas, e atualizará o site. Deseja continuar?')) return
@@ -426,7 +431,7 @@ function App() {
   useEffect(() => { const root = document.querySelector<HTMLElement>('.app-shell'); if (root) normalizeVisibleEscapes(root) }, [])
   useEffect(() => { loadCurrentLocation() }, [])
 
-  const loadWeather = async (coordinates: Coordinates) => {
+  const loadWeather = async (coordinates: Coordinates, forceRefresh = false) => {
     setLoadingWeather(true)
     setWeatherError('')
     try {
@@ -441,7 +446,7 @@ function App() {
       })
       const cacheKey = `hub-weather-v3:${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`
       const cached = sessionStorage.getItem(cacheKey)
-      if (cached) {
+      if (!forceRefresh && cached) {
         const saved = JSON.parse(cached) as { timestamp: number; weather: WeatherData }
         if (Date.now() - saved.timestamp < WEATHER_CACHE_TTL) {
           setWeather(saved.weather)
@@ -469,6 +474,13 @@ function App() {
     if (!location) return
     const timer = window.setInterval(() => loadWeather(location), Number(import.meta.env.VITE_WEATHER_UPDATE_INTERVAL || 300000))
     return () => window.clearInterval(timer)
+  }, [location])
+  useEffect(() => {
+    const refreshWeather = () => {
+      if (location) void loadWeather(location, true)
+    }
+    window.addEventListener('hub:data-refresh', refreshWeather)
+    return () => window.removeEventListener('hub:data-refresh', refreshWeather)
   }, [location])
 
   const current = weather?.current
@@ -506,7 +518,6 @@ function App() {
           <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
           <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
         </button>
-        <h1>Hub Principal</h1>
         <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
         <LiveClock />
         <p className="timezone">Horário local do seu dispositivo</p>

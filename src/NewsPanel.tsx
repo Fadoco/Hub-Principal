@@ -158,6 +158,14 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
     setRetryToken((token) => token + 1)
   }
 
+  useEffect(() => {
+    const refreshVisibleNews = () => {
+      if (isNearViewport && (!local || locationCity)) refreshNews()
+    }
+    window.addEventListener('hub:data-refresh', refreshVisibleNews)
+    return () => window.removeEventListener('hub:data-refresh', refreshVisibleNews)
+  }, [isNearViewport, local, locationCity])
+
   return (
     <section className="news-panel" ref={panelRef}>
       <div className="news-heading">

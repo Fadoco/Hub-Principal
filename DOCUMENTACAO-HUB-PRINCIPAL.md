@@ -340,7 +340,7 @@ O projeto registra um Service Worker em `public/sw.js`.
 
 Esse conjunto permite que o site seja "instalável" e tenha aparência de app nativo em alguns navegadores.
 
-Além da verificação de atualização do Service Worker, o app recarrega a página após 30 minutos para buscar uma versão nova e atualizar todos os painéis. Se a aba ficar suspensa pelo navegador, a atualização acontece quando ela volta a ficar visível.
+O app emite um evento de atualização de dados a cada 30 minutos, sem recarregar a página nem alterar a posição de rolagem. Os painéis atualizam clima, cotações, notícias e imagens do satélite; se a aba ficar suspensa pelo navegador, a atualização acontece quando ela volta a ficar visível. Atualizações do Service Worker também não forçam recarga da página aberta.
 
 ---
 

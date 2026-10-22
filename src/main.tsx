@@ -3,17 +3,19 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-const FULL_SITE_REFRESH_INTERVAL_MS = 30 * 60 * 1000
-const nextFullSiteRefresh = Date.now() + FULL_SITE_REFRESH_INTERVAL_MS
-const refreshSiteIfDue = () => {
-  if (Date.now() >= nextFullSiteRefresh && document.visibilityState === 'visible') {
-    window.location.reload()
+const DATA_REFRESH_INTERVAL_MS = 30 * 60 * 1000
+const DATA_REFRESH_EVENT = 'hub:data-refresh'
+let nextDataRefresh = Date.now() + DATA_REFRESH_INTERVAL_MS
+const refreshDataIfDue = () => {
+  if (Date.now() >= nextDataRefresh && document.visibilityState === 'visible') {
+    nextDataRefresh = Date.now() + DATA_REFRESH_INTERVAL_MS
+    window.dispatchEvent(new Event(DATA_REFRESH_EVENT))
   }
 }
 
-window.setTimeout(refreshSiteIfDue, FULL_SITE_REFRESH_INTERVAL_MS)
-document.addEventListener('visibilitychange', refreshSiteIfDue)
-window.addEventListener('pageshow', refreshSiteIfDue)
+window.setInterval(refreshDataIfDue, 60000)
+document.addEventListener('visibilitychange', refreshDataIfDue)
+window.addEventListener('pageshow', refreshDataIfDue)
 
 const currentUrl = new URL(window.location.href)
 if (currentUrl.searchParams.has('_refresh')) {
@@ -38,9 +40,6 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
       .then((registration) => registration.update())
       .catch((error: unknown) => console.error('Não foi possível verificar atualizações do site.', error))
 
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload()
-    }, { once: true })
   })
 }
 
