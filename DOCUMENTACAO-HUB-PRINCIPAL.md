@@ -10,7 +10,6 @@ O Hub Principal é uma dashboard pessoal em React que reúne em uma única inter
 - cotações de moedas (Dólar e Euro em relação ao Real);
 - notícias por categoria;
 - links úteis para ferramentas e serviços;
-- radar meteorológico com redirecionamento para o site oficial do IPMet;
 - suporte a instalação como app PWA.
 
 O projeto tem uma estética "cyberpunk"/"command center", com fundo escuro, elementos em azul e ciano, como se fosse um painel de monitoramento.
@@ -31,7 +30,7 @@ O projeto tem uma estética "cyberpunk"/"command center", com fundo escuro, elem
 - OpenStreetMap / Nominatim: localização e tiles do mapa
 - Open-Meteo: previsão meteorológica
 - AwesomeAPI: cotações de moedas
-- RSS2JSON + Google News RSS: notícias
+- Cloudflare Workers + Google News RSS: notícias
 - manifest + service worker: PWA
 
 ### Estrutura de build
@@ -230,7 +229,7 @@ Exibe:
 - atualizações a cada 60 segundos
 
 ### 6.4 `NewsPanel`
-Busca notícias por categoria de forma dinâmica:
+Busca notícias por categoria usando a URL `VITE_NEWS_API_URL`:
 
 - Notícias locais
 - Jogos
@@ -238,12 +237,14 @@ Busca notícias por categoria de forma dinâmica:
 - Animes
 - Mundo/internacional
 
-A busca usa RSS do Google News e passa por um proxy externo (`rss2json`).
+A API intermediária em `worker/index.js` consulta o RSS do Google Notícias, permite apenas origens configuradas em `worker/wrangler.toml` e mantém cache por cinco minutos. O componente analisa o XML, mantém um cache de sessão, carrega os cards quando se aproximam da tela e permite tentar novamente.
+
+Se `VITE_NEWS_API_URL` não estiver configurada, os cards mantêm links diretos para as buscas no Google Notícias, sem tentar carregar manchetes dentro do Hub.
 
 Funções relevantes:
 - `normalizeNewsItems`: remove duplicados e ordena por data
-- `smartQuery`: ajusta termos para melhorar a busca semântica
-- `sessionStorage`: usa cache em memória para reduzir requisições repetidas
+- `parseNewsFeed`: converte o RSS XML em notícias exibíveis
+- `sessionStorage`: mantém cache de notícias por categoria
 
 ### 6.5 `UsefulSites`
 Lista sites úteis em cards com:
@@ -267,35 +268,9 @@ Se disponível, o botão aparece e permite instalar a página como app.
 
 ---
 
-## 7. Radar meteorológico
+## 7. Mapa da localização
 
-O site possui uma seção de radar com uma mensagem explícita:
-
-> O IPMet bloqueia incorporações dentro de outros sites.
-
-Ou seja, a página não consegue embutir diretamente o radar da instituição. Em vez disso, ela mostra uma área informativa e disponibiliza links diretos para:
-
-- página do radar principal;
-- satélite meteorológico;
-- radar animado PPI;
-- imagem com cidades;
-- radar GIS satélite.
-
-Esses links são chamados pela função `openRadarWindow`, que abre a janela em segundo plano com tamanho maior.
-
-### Links principais do radar
-```ts
-const radarPageUrl = 'https://www.ipmetradar.com.br/2mobileGis.php'
-```
-
-E uma lista de fontes:
-
-- Satélite meteorológico
-- Radar animado PPI
-- Imagem com cidades
-- Radar GIS satélite
-
-Isso funciona como uma ótima alternativa para manter o usuario no hub sem perder a funcionalidade do monitoramento oficial.
+O mapa usa Leaflet e os tiles do OpenStreetMap para mostrar a localização selecionada. O radar IPMet foi removido porque o site bloqueia a incorporação e a área não apresentava informação útil.
 
 ---
 
@@ -328,7 +303,6 @@ Isso faz duas coisas:
 Esse padrão é usado em:
 - links de notícias;
 - sites úteis;
-- radar oficial;
 - botões de fontes externas.
 
 ---
@@ -383,7 +357,7 @@ O site depende de serviços fora do projeto:
 
 - Open-Meteo para clima
 - Nominatim para geolocalização reversa
-- RSS2JSON para notícias
+- Cloudflare Worker para buscar o RSS do Google Notícias
 - AwesomeAPI para cotações
 
 Isso significa que:
@@ -394,8 +368,8 @@ Isso significa que:
 ### 11.2 Navegador
 A geolocalização exige permissões do usuário. Sem isso, a UI mostra mensagens de aviso.
 
-### 11.3 Radar
-Como o IPMet bloqueia embeds, a página usa redirecionamento para o site oficial ao invés de incorporar o sensor diretamente.
+### 11.3 API de notícias
+O Worker aceita somente requisições `GET` ao feed de notícias, valida o tamanho da busca e libera CORS apenas para as origens cadastradas em `ALLOWED_ORIGINS`. O cache reduz chamadas ao provedor; a disponibilidade do RSS do Google Notícias ainda depende do serviço externo.
 
 ---
 

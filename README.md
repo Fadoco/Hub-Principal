@@ -1,28 +1,53 @@
 # Hub Principal
 
-Dashboard cyberpunk de clima, previsao, cotacoes, radares IPMet e portais de noticias.
+Dashboard pessoal de clima, previsão, cotações, mapa, notícias por categoria e links úteis.
 
 ## Rodar localmente
 
-```bash
+```powershell
 npm install
 npm run dev
 ```
 
 Abra `http://127.0.0.1:5173/`.
 
-## Publicar no GitHub Pages
+## Notícias no Hub
 
-Este projeto ja esta configurado para o repositorio `https://github.com/Fadoco/Hub-Principal.git`.
+O frontend do GitHub Pages não consegue ler o RSS do Google Notícias diretamente por causa de CORS. O projeto inclui um Cloudflare Worker que busca o feed, limita a origem e a consulta, e mantém cache por cinco minutos.
 
-1. Envie os arquivos para a branch `main`.
-2. No GitHub, abra **Settings > Pages**.
-3. Em **Build and deployment**, selecione **GitHub Actions**.
-4. Aguarde o workflow `Deploy Hub Principal` em **Actions**.
+1. Crie uma conta Cloudflare e autentique o Wrangler:
 
-O workflow em `.github/workflows/deploy.yml` instala as dependencias, gera o build com o caminho correto do repositorio e publica automaticamente a cada push.
+   ```powershell
+   npx wrangler login
+   ```
 
-O endereco sera:
+2. Publique o Worker:
+
+   ```powershell
+   npm run deploy:news-api
+   ```
+
+   O Wrangler exibirá o endereço `workers.dev` da API. O endpoint de notícias termina em `/news`.
+
+3. Configure esse endereço como `VITE_NEWS_API_URL` em `.env.local` (arquivo local, não versionado):
+
+   ```text
+   VITE_NEWS_API_URL=https://SEU-WORKER.workers.dev/news
+   ```
+
+4. Gere novamente a versão do GitHub Pages e publique a pasta `docs/`:
+
+   ```powershell
+   npm run build:pages
+   ```
+
+Sem essa configuração, o Hub continua oferecendo links que abrem as buscas diretamente no Google Notícias, mas não exibe manchetes dentro dos cartões. Para um domínio próprio, adicione a origem do site em `ALLOWED_ORIGINS` no [worker/wrangler.toml](./worker/wrangler.toml) e publique o Worker novamente.
+
+## Publicação no GitHub Pages
+
+O build de publicação é gerado em `docs/`. Configure o GitHub Pages para publicar a pasta `docs` da branch principal, ou adapte seu workflow de deploy para gerar `npm run build:pages` com `VITE_NEWS_API_URL` configurada.
+
+O endereço atual do projeto é:
 
 ```text
 https://fadoco.github.io/Hub-Principal/
@@ -30,18 +55,16 @@ https://fadoco.github.io/Hub-Principal/
 
 ## Fontes externas
 
-- Open-Meteo: clima e previsao.
-- Nominatim/OpenStreetMap: localizacao reversa e mapa.
-- AwesomeAPI: cotacoes USD/BRL e EUR/BRL.
-- Google News RSS via RSS2JSON: portais de noticias.
-- IPMet/Unesp: links oficiais de radar e satelite.
-
-O GitHub Pages hospeda apenas o frontend. As APIs externas precisam continuar acessiveis e podem aplicar limites, CORS ou indisponibilidade. A localizacao exige HTTPS, condicao atendida pelo GitHub Pages.
+- Open-Meteo: clima e previsão.
+- Nominatim/OpenStreetMap: localização e mapa.
+- AwesomeAPI: cotações USD/BRL e EUR/BRL.
+- Google Notícias: manchetes via RSS, usando o Cloudflare Worker.
 
 ## Comandos
 
-```bash
+```powershell
 npm run build
+npm run build:pages
 npm run lint
 npm run preview
 ```

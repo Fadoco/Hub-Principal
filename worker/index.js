@@ -1,0 +1,112 @@
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://fadoco.github.io',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]
+const FEED_CACHE_TTL_SECONDS = 300
+
+function getAllowedOrigins(env) {
+  return (env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(','))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+}
+
+function corsHeaders(origin, allowedOrigins) {
+  const headers = new Headers({
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+    'X-Content-Type-Options': 'nosniff',
+  })
+  if (origin && allowedOrigins.includes(origin)) headers.set('Access-Control-Allow-Origin', origin)
+  return headers
+}
+
+function jsonResponse(data, status, headers) {
+  const responseHeaders = new Headers(headers)
+  responseHeaders.set('Content-Type', 'application/json; charset=utf-8')
+  return new Response(JSON.stringify(data), { status, headers: responseHeaders })
+}
+
+function withCors(response, headers) {
+  const responseHeaders = new Headers(response.headers)
+  headers.forEach((value, key) => responseHeaders.set(key, value))
+  return new Response(response.body, { status: response.status, headers: responseHeaders })
+}
+
+export default {
+  async fetch(request, env, context) {
+    const requestUrl = new URL(request.url)
+    const origin = request.headers.get('Origin')
+    const allowedOrigins = getAllowedOrigins(env)
+    const headers = corsHeaders(origin, allowedOrigins)
+
+    if (origin && !allowedOrigins.includes(origin)) {
+      return jsonResponse({ error: 'Origin is not allowed.' }, 403, new Headers({ 'Vary': 'Origin' }))
+    }
+
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers })
+    if (request.method !== 'GET') {
+      return jsonResponse({ error: 'Method not allowed.' }, 405, headers)
+    }
+    if (requestUrl.pathname === '/health') {
+      return jsonResponse({ status: 'ok' }, 200, headers)
+    }
+    if (requestUrl.pathname !== '/news') {
+      return jsonResponse({ error: 'Not found.' }, 404, headers)
+    }
+
+    const query = requestUrl.searchParams.get('q')?.trim()
+    const containsControlCharacter = query && [...query].some((character) => {
+      const code = character.charCodeAt(0)
+      return code <= 0x1f || code === 0x7f
+    })
+    if (!query || query.length > 160 || containsControlCharacter) {
+      return jsonResponse({ error: 'A news query between 1 and 160 characters is required.' }, 400, headers)
+    }
+
+    const feedUrl = new URL('https://news.google.com/rss/search')
+    feedUrl.searchParams.set('q', query)
+    feedUrl.searchParams.set('hl', 'pt-BR')
+    feedUrl.searchParams.set('gl', 'BR')
+    feedUrl.searchParams.set('ceid', 'BR:pt-419')
+
+    const cacheKey = new Request(`${requestUrl.origin}/__feed-cache?${feedUrl.searchParams.toString()}`)
+    const bypassCache = requestUrl.searchParams.get('refresh') === '1'
+
+    try {
+      const cached = bypassCache ? null : await caches.default.match(cacheKey)
+      if (cached) return withCors(cached, headers)
+
+      const upstream = await fetch(feedUrl, {
+        headers: { Accept: 'application/rss+xml, application/xml;q=0.9' },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!upstream.ok) {
+        console.error('Google News RSS returned an unsuccessful status.', upstream.status)
+        return jsonResponse({ error: 'The news provider is temporarily unavailable.' }, 502, headers)
+      }
+
+      const feed = await upstream.text()
+      if (!feed.includes('<rss') && !feed.includes('<feed')) {
+        console.error('Google News returned an unexpected feed response.')
+        return jsonResponse({ error: 'The news provider returned an invalid feed.' }, 502, headers)
+      }
+
+      const feedResponse = new Response(feed, {
+        headers: {
+          'Cache-Control': `public, max-age=${FEED_CACHE_TTL_SECONDS}`,
+          'Content-Type': 'application/rss+xml; charset=utf-8',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+      context.waitUntil(caches.default.put(cacheKey, feedResponse.clone()))
+      return withCors(feedResponse, headers)
+    } catch (error) {
+      console.error('Unable to retrieve Google News RSS.', error)
+      return jsonResponse({ error: 'The news provider could not be reached.' }, 502, headers)
+    }
+  },
+}

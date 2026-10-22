@@ -1,9 +1,10 @@
-﻿import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
-import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Compass, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Navigation, Newspaper, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind } from 'lucide-react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Compass, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Navigation, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind } from 'lucide-react'
 import './App.css'
+import CurrencyPanel from './CurrencyPanel'
+import NewsPanel from './NewsPanel'
+
+const WeatherMap = lazy(() => import('./WeatherMap'))
 
 type Coordinates = { latitude: number; longitude: number }
 type LocationInfo = Coordinates & { city: string; state: string; country: string }
@@ -20,15 +21,7 @@ type CitySuggestion = {
 type WeatherData = { current: Record<string, number | string>; hourly: { time: string[]; temperature_2m: number[]; precipitation: number[]; precipitation_probability: number[]; weather_code: number[] }; daily: { time: string[]; weather_code: number[]; precipitation_probability_max: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; sunrise: string[]; sunset: string[] } }
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const WEATHER_CACHE_TTL = 180000
-const CURRENCY_CACHE_TTL = 60000
 const FAVORITE_LOCATIONS_KEY = 'hub-favorite-locations'
-const radarPageUrl = 'https://www.ipmetradar.com.br/2mobileGis.php'
-const radarSources = [
-  { label: 'Satélite meteorológico', description: 'Animação de imagens de satélite', url: 'https://www.ipmetradar.com.br/2satelite.php' },
-  { label: 'Radar animado PPI', description: 'Animaçao das ultimas imagens', url: 'https://www.ipmetradar.com.br/2animRadar.php' },
-  { label: 'Radar GIS Local', description: 'Radar GIS e cidades', url: 'https://www.ipmetradar.com.br/2mobileGis.php' },
-  { label: 'Radar GIS satélite', description: 'Mapas GIS e imagens de satélite', url: 'https://www.ipmetradar.com.br/2satGis.php' },
-]
 const usefulSites = [
   { label: 'Remover fundo', description: 'Remova fundos de imagens', url: 'https://www.photoroom.com/pt-br/tools/background-remover' },
   { label: 'Gerenciador de PDF', description: 'Editar e organizar PDFs', url: 'https://www.ilovepdf.com/' },
@@ -37,7 +30,6 @@ const usefulSites = [
   { label: 'SAAEB', description: 'Serviços de água e esgoto', url: 'https://saaeb.com.br/' },
   { label: 'CPFL', description: 'Acesso e serviços CPFL', url: 'https://cpflb2cprd.b2clogin.com/cpflb2cprd.onmicrosoft.com/b2c_1a_signup_signin_mfa_front/oauth2/v2.0/authorize?p=B2C_1A_SIGNUP_SIGNIN_MFA_FRONT&client_id=17d5831d-6741-4670-8085-d1d34e37aec1&nonce=defaultNonce&redirect_uri=https%3A%2F%2Fwww.cpfl.com.br%2Fb2c-auth%2Freceive-token&scope=17d5831d-6741-4670-8085-d1d34e37aec1%20offline_access&response_type=code&prompt=login&response_mode=query' },
 ]
-const markerIcon = L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41] })
 const weatherLabels: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina congelante', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada' }
 const WeatherIcon = ({ code, size = 24 }: { code: number; size?: number }) => code >= 95 ? <CloudRain size={size} /> : code >= 51 ? <CloudDrizzle size={size} /> : code === 0 ? <Sun size={size} /> : code <= 2 ? <CloudSun size={size} /> : <Cloud size={size} />
 const formatTime = (value: string | number | undefined) => value ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '--'
@@ -164,136 +156,45 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
     .slice(0, 8)
 }
 
-function RecenterMap({ coordinates }: { coordinates: Coordinates }) {
-  const map = useMap();
-  useEffect(() => { map.setView([coordinates.latitude, coordinates.longitude]) }, [coordinates, map]);
-  return null
-}
-
-type ExchangeQuote = { code: string; name: string; bid: string; ask: string; pctChange: string; create_date: string }
-type ExchangeData = { USDBRL: ExchangeQuote; EURBRL: ExchangeQuote }
-
-function CurrencyPanel() {
-  const [quotes, setQuotes] = useState<ExchangeData | null>(null)
-  const [error, setError] = useState(false)
-
-  const loadQuotes = async () => {
-    const cached = sessionStorage.getItem('hub-currency')
-    if (cached) {
-      try {
-        const saved = JSON.parse(cached) as { timestamp: number; quotes: ExchangeData }
-        if (Date.now() - saved.timestamp < CURRENCY_CACHE_TTL) {
-          setQuotes(saved.quotes)
-          setError(false)
-          return
-        }
-      } catch {
-        sessionStorage.removeItem('hub-currency')
-      }
-    }
-
-    try {
-      const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL')
-      if (!response.ok) throw new Error('exchange')
-      const nextQuotes = await response.json() as ExchangeData
-      sessionStorage.setItem('hub-currency', JSON.stringify({ timestamp: Date.now(), quotes: nextQuotes }))
-      setQuotes(nextQuotes)
-      setError(false)
-    } catch {
-      setError(true)
-    }
-  }
-
-  useEffect(() => {
-    loadQuotes()
-    const timer = window.setInterval(loadQuotes, 60000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const money = (value: string) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const quoteRows = quotes ? [{ code: 'BRL', label: 'Real brasileiro', value: 'R$ 1,00', change: '0,00%', time: '' }, { code: 'USD', label: 'Dólar americano', value: money(quotes.USDBRL.bid), change: `${Number(quotes.USDBRL.pctChange).toFixed(2).replace('.', ',')}%`, time: quotes.USDBRL.create_date }, { code: 'EUR', label: 'Euro', value: money(quotes.EURBRL.bid), change: `${Number(quotes.EURBRL.pctChange).toFixed(2).replace('.', ',')}%`, time: quotes.EURBRL.create_date }] : []
-
-  return <section className="currency-panel"><div className="currency-heading"><div><span className="section-kicker">MERCADO EM TEMPO REAL</span><h3>Cotações</h3></div><span className="currency-live"><span className="live-dot" /> Atualiza a cada 1 min</span></div>{error && !quotes ? <div className="currency-error">Cotações temporariamente indisponíveis. Tentaremos novamente.</div> : <div className="currency-table"><div className="currency-table-head"><span>Ativo</span><span>Valor em BRL</span><span>Variação</span></div>{quoteRows.map((row) => <div className="currency-row" key={row.code}><span className="currency-name"><b>{row.code}</b><small>{row.label}</small></span><strong>{row.value}</strong><span className={row.change.startsWith('-') ? 'negative' : 'positive'}>{row.change}</span></div>)}</div>}{quotes && <small className="currency-updated">Compra de referência · última coleta: {new Date(quotes.USDBRL.create_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>}</section>
-}
-
-type NewsItem = { title: string; link: string; pubDate: string; author?: string }
-type NewsPanelProps = { location: LocationInfo | null; title: string; query: string; local?: boolean }
-const NEWS_CACHE_TTL = 300000
-
-function normalizeNewsItems(items: NewsItem[]) {
-  const unique = new Map<string, NewsItem>()
-  items.filter((item) => item.title && item.link).forEach((item) => {
-    const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-    if (!unique.has(key)) unique.set(key, item)
-  })
-  return [...unique.values()].sort((first, second) => new Date(second.pubDate).getTime() - new Date(first.pubDate).getTime()).slice(0, 8)
-}
-
-function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
-  const [items, setItems] = useState<NewsItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
-
-  const smartQuery = query === 'noticias jogos games' ? 'noticias jogos games lancamentos Nintendo PlayStation Xbox PC' : query === 'noticias filmes cinema' ? 'noticias filmes cinema streaming Netflix trailers series' : query === 'noticias animes' ? 'noticias animes mangas lancamentos temporada Crunchyroll' : query === 'noticias mundo internacional global' ? 'noticias' : query === 'noticias' ? 'noticias prefeitura eventos transito cultura seguranca' : query
-
-  useEffect(() => {
-    let cancelled = false
-    const controller = new AbortController()
-    const locationQuery = local && location ? location.city : ''
-    if (local && !location) return
-
-    const searchQuery = local ? `${locationQuery} noticias` : `${smartQuery} when:7d`
-    const cacheKey = `hub-news:${searchQuery}`
-
-    const loadNews = async () => {
-      const cached = sessionStorage.getItem(cacheKey)
-      if (cached) {
-        try {
-          const saved = JSON.parse(cached) as { timestamp: number; items: NewsItem[] }
-          if (Date.now() - saved.timestamp < NEWS_CACHE_TTL) {
-            setItems(saved.items)
-            setError(false)
-            return
-          }
-        } catch {
-          sessionStorage.removeItem(cacheKey)
-        }
-      }
-
-      setLoading(true)
-      try {
-        const rss = encodeURIComponent(`https://news.google.com/rss/search?q=${encodeURIComponent(searchQuery)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`)
-        const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rss}`, { signal: controller.signal })
-        if (!response.ok) throw new Error('news')
-        const data = await response.json()
-        const nextItems = normalizeNewsItems(data.items || [])
-        if (!cancelled) {
-          setItems(nextItems)
-          setError(false)
-          sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: nextItems }))
-        }
-      } catch (error) {
-        if (!cancelled && (error as Error).name !== 'AbortError') setError(true)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    const schedule = window.setTimeout(loadNews, 700)
-    const timer = window.setInterval(loadNews, NEWS_CACHE_TTL)
-    return () => { cancelled = true; controller.abort(); window.clearTimeout(schedule); window.clearInterval(timer) }
-  }, [location, smartQuery, local])
-
-  const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(local && location ? location.city : `${smartQuery} when:7d`)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
-
-  return <section className="news-panel"><div className="news-heading"><div><span className="section-kicker">PORTAL DE NOTÍCIAS</span><h3>{title}</h3></div><a className="news-search" href={searchUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openSecondaryWindow(searchUrl) }}><Newspaper size={15} /> Ver todas</a></div>{loading && !items.length ? <div className="news-empty">Buscando notícias...</div> : error && !items.length ? <div className="news-empty">Não foi possível atualizar as notícias agora.</div> : <div className="news-list">{items.map((item) => <a className="news-item" href={item.link} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openSecondaryWindow(item.link) }} key={item.link}><span><strong>{item.title}</strong><small>{item.author || 'Google News'} · {new Date(item.pubDate).toLocaleDateString('pt-BR')}</small></span><ExternalLink size={14} /></a>)}</div>}</section>
-}
-
 function Metric({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: string; detail?: string; tone?: string }) {
   return <><div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>{label === 'Nuvens' && <CurrencyPanel />}</>
 }
 
-function openRadarWindow(url: string) { window.open(url, '_blank', 'noopener,noreferrer,width=1280,height=900') }
+function DeferredWeatherMap({ coordinates }: { coordinates: Coordinates }) {
+  const frameRef = useRef<HTMLDivElement | null>(null)
+  const [shouldLoad, setShouldLoad] = useState(false)
+
+  useEffect(() => {
+    const frame = frameRef.current
+    if (!frame || !('IntersectionObserver' in window)) {
+      setShouldLoad(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setShouldLoad(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '250px' })
+
+    observer.observe(frame)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div className="map-frame" ref={frameRef}>
+      {shouldLoad ? (
+        <Suspense fallback={<div className="map-loading">Carregando mapa...</div>}>
+          <WeatherMap coordinates={coordinates} />
+        </Suspense>
+      ) : (
+        <div className="map-placeholder"><Compass size={28} /><span>O mapa será carregado quando esta seção estiver próxima.</span></div>
+      )}
+    </div>
+  )
+}
+
 function openSecondaryWindow(url: string) { const popup = window.open(url, '_blank', 'noopener,noreferrer,width=1280,height=900'); if (!popup) window.location.href = url }
 
 function UsefulSites() {
@@ -340,24 +241,6 @@ function LiveClock() {
   return <div className="clock">{time.toLocaleTimeString('pt-BR')}</div>
 }
 
-async function resetSiteCache() {
-  if ('serviceWorker' in navigator) {
-    const registrations = await navigator.serviceWorker.getRegistrations()
-    await Promise.all(registrations.map((registration) => registration.unregister()))
-  }
-
-  if ('caches' in window) {
-    const cacheNames = await caches.keys()
-    await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
-  }
-
-  for (const key of Object.keys(localStorage)) {
-    if (key !== FAVORITE_LOCATIONS_KEY) localStorage.removeItem(key)
-  }
-  sessionStorage.clear()
-  window.location.reload()
-}
-
 function App() {
   const [now] = useState(new Date())
   const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(null)
@@ -367,6 +250,8 @@ function App() {
   const [weatherError, setWeatherError] = useState('')
   const [loadingWeather, setLoadingWeather] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [isResettingSite, setIsResettingSite] = useState(false)
+  const [siteResetError, setSiteResetError] = useState('')
   const [favoriteLocations, setFavoriteLocations] = useState<FavoriteLocationsState>(readFavoriteLocations)
   const [isCityModalOpen, setIsCityModalOpen] = useState(false)
   const [cityQuery, setCityQuery] = useState('')
@@ -374,6 +259,35 @@ function App() {
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [selectedCitySuggestion, setSelectedCitySuggestion] = useState<CitySuggestion | null>(null)
   const isCurrentLocationFavorite = Boolean(location && favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(location)))
+
+  const resetSiteData = async () => {
+    if (!window.confirm('Isso apagará os dados salvos, incluindo cidades favoritas, e atualizará o site. Deseja continuar?')) return
+
+    setIsResettingSite(true)
+    setSiteResetError('')
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        const unregistered = await Promise.all(registrations.map((registration) => registration.unregister()))
+        if (unregistered.some((success) => !success)) throw new Error('service-worker-unregister')
+      }
+
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
+      }
+
+      localStorage.clear()
+      sessionStorage.clear()
+
+      const refreshUrl = new URL(window.location.href)
+      refreshUrl.searchParams.set('_refresh', String(Date.now()))
+      window.location.replace(refreshUrl.toString())
+    } catch {
+      setIsResettingSite(false)
+      setSiteResetError('Não foi possível limpar os dados e atualizar o site. Verifique as permissões do navegador e tente novamente.')
+    }
+  }
 
   const updateFavoriteLocations = (items: LocationInfo[]) => {
     try {
@@ -618,8 +532,9 @@ function App() {
   return (
     <main className="app-shell notranslate" translate="no">
       <header className="hero-header">
-        <button className="cache-reset-button" type="button" title="Limpar cache e atualizar site" aria-label="Limpar cache e atualizar site" onClick={resetSiteCache}>
-          <RefreshCw size={17} />
+        <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
+          <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
+          <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
         </button>
         <div className="eyebrow"><span className="live-dot" /> PAINEL PESSOAL DE INFORMAÇÕES</div>
         <h1>Hub Principal</h1>
@@ -627,6 +542,7 @@ function App() {
         <LiveClock />
         <p className="timezone">Horário local do seu dispositivo</p>
         <InstallApp />
+        {siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
       </header>
 
       <section className="content-grid">
@@ -769,64 +685,33 @@ function App() {
         </section>
       </section>
 
-      <section className="panel radar-panel">
+      <section className="panel map-panel">
         <div className="section-heading">
-          <div><span className="section-kicker">MONITORAMENTO AO VIVO</span><h2>Radar meteorológico</h2></div>
-          <div className="source-badge"><span className="live-dot" /> IPMet / Unesp</div>
+          <div><span className="section-kicker">SUA REGIÃO</span><h2>Mapa da sua localização</h2></div>
         </div>
 
-        <p className="panel-intro">Acompanhe a animação oficial da chuva sobre o estado de São Paulo.</p>
-
-        <div className="radar-layout">
-          <div className="radar-frame">
-            <div className="radar-unavailable">
-              <div className="radar-status-icon"><AlertCircle size={27} /></div>
-              <strong>Radar disponível no site oficial</strong>
-              <span>O IPMet bloqueia incorporações dentro de outros sites.</span>
-              <a href={radarPageUrl} target="_blank" rel="noreferrer">Abrir radar IPMet <span aria-hidden="true">&rarr;</span></a>
-            </div>
-            <div className="radar-overlay"><span><span className="live-dot" /> AO VIVO</span><a href={radarPageUrl} target="_blank" rel="noreferrer">Abrir no IPMet &rarr;</a></div>
-          </div>
-
+        {location ? (
+          <DeferredWeatherMap coordinates={location} />
+        ) : (
           <div className="map-frame">
-            {location ? (
-              <MapContainer center={[location.latitude, location.longitude]} zoom={7} scrollWheelZoom={true} className="map">
-                <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <Marker position={[location.latitude, location.longitude]} icon={markerIcon} />
-                <RecenterMap coordinates={location} />
-              </MapContainer>
-            ) : (
-              <div className="map-placeholder"><Compass size={28} /><span>O mapa será centralizado<br />quando sua localização estiver disponível.</span></div>
-            )}
-            <div className="map-label"><MapPin size={13} /> Sua localização</div>
+            <div className="map-placeholder"><Compass size={28} /><span>O mapa será centralizado<br />quando sua localização estiver disponível.</span></div>
           </div>
-        </div>
-
-        <div className="radar-sources">
-          {radarSources.map((source) => (
-            <button className="radar-source-card" key={source.url} type="button" onClick={() => openRadarWindow(source.url)}>
-              <span><strong>{source.label}</strong><small>{source.description}</small></span>
-              <ExternalLink size={16} />
-            </button>
-          ))}
-        </div>
-
-        <div className="radar-footer"><span><RefreshCw size={14} /> Atualização automática a cada 5 min</span><span>Infos oficiais · IPMet / Unesp</span></div>
+        )}
       </section>
 
       <div className="news-portals">
-        <NewsPanel location={location} local title={location ? `Portal de noticias - ${location.city}` : 'Portal de noticias locais'} query="noticias" />
-        <NewsPanel location={location} title="Portal de noticias Jogos" query="noticias jogos games" />
-        <NewsPanel location={location} title="Portal de noticias Filmes" query="noticias filmes cinema" />
-        <NewsPanel location={location} title="Portal de noticias Animes" query="noticias animes" />
-        <NewsPanel location={location} title="Portal de noticias Globais" query="noticias mundo internacional global" />
+        <NewsPanel locationCity={location?.city || null} local title={location ? `Portal de noticias - ${location.city}` : 'Portal de noticias locais'} query="noticias" />
+        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Jogos" query="jogos games lançamentos Nintendo PlayStation Xbox PC" />
+        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Filmes" query="filmes cinema streaming Netflix séries trailers" />
+        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Animes" query="animes mangás lançamentos temporada Crunchyroll" />
+        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Globais" query="notícias internacionais mundo" />
       </div>
 
       <UsefulSites />
 
       <footer>
         <strong>Hub Principal</strong>
-        <span>Dados meteorológicos fornecidos por serviços externos &middot; IPMet / Unesp</span>
+        <span>Dados meteorológicos fornecidos por serviços externos</span>
         <span>Fuso: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
       </footer>
 
