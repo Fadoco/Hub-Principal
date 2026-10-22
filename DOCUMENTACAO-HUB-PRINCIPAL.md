@@ -6,7 +6,7 @@ O Hub Principal é uma dashboard pessoal em React que reúne em uma única inter
 
 - clima em tempo real e previsão;
 - localização do usuário via geolocalização;
-- mapa interativo com Leaflet;
+- imagens animadas do satélite meteorológico GOES do INMET;
 - cotações de moedas (Dólar e Euro em relação ao Real);
 - notícias por categoria;
 - links úteis para ferramentas e serviços;
@@ -25,9 +25,9 @@ O projeto tem uma estética "cyberpunk"/"command center", com fundo escuro, elem
 - CSS puro
 
 ### Bibliotecas adicionais
-- Leaflet + react-leaflet: mapa interativo
 - lucide-react: ícones
-- OpenStreetMap / Nominatim: localização e tiles do mapa
+- OpenStreetMap / Nominatim: busca de localização
+- API de satélite do INMET: imagens GOES em infravermelho térmico
 - Open-Meteo: previsão meteorológica
 - AwesomeAPI: cotações de moedas
 - Cloudflare Workers + Bing Notícias RSS: notícias
@@ -175,18 +175,10 @@ Depois, a aplicação:
 - monta lista de previsão por horas e por dias;
 - atualiza automaticamente a cada 5 minutos por padrão.
 
-### 5.4 Mapa interativo
-A aplicação usa `react-leaflet` para renderizar um mapa centrado na localização do usuário.
+### 5.4 Imagens de satélite
+O componente `SatellitePanel` busca no serviço de satélite do INMET as imagens GOES mais recentes sobre o Brasil, no produto Topo das Nuvens (T °C). A animação percorre os quadros da data mais recente, pré-carregando os próximos três quadros e mantendo até doze em cache para reduzir as pausas. Os controles ficam reduzidos a ícones de animação, atualização e tela cheia, sem exibir repetidamente mensagens de carregamento.
 
-Componentes principais:
-- `MapContainer`
-- `TileLayer` (OpenStreetMap)
-- `Marker` para posicionar o ponto atual
-- `RecenterMap` para centralizar o mapa quando a localização muda
-
-O mapa tem duas formas de exibição:
-- com localização disponível: mostra o ponto e centraliza o mapa;
-- sem localização: mostra uma área de placeholder com a mensagem de espera.
+As imagens são identificadas com a fonte INMET e incluem um link para o portal oficial. Elas são imagens de satélite, não um mosaico de radar de precipitação. Os atalhos IPMet/Unesp continuam abrindo as páginas oficiais em outra aba.
 
 ---
 
@@ -270,7 +262,7 @@ Se disponível, o botão aparece e permite instalar a página como app.
 
 ## 7. Mapa da localização
 
-O mapa usa Leaflet e os tiles do OpenStreetMap para mostrar a localização selecionada. A seção “Radares e satélites” oferece links externos para as páginas oficiais do IPMet/Unesp. Os radares não são incorporados nem apresentados como uma transmissão ao vivo dentro do Hub.
+A seção de satélite exibe imagens GOES do INMET e oferece controles para animar ou selecionar os registros recentes. A seção “Radares e satélites” mantém links externos para as páginas oficiais do IPMet/Unesp; esses radares não são incorporados dentro do Hub.
 
 ---
 

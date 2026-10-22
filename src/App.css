@@ -44,8 +44,9 @@ button { color: inherit; }
 h1, h2, h3, h4, p { margin: 0; }
 h1 { color: var(--ink); font-size: clamp(34px, 5vw, 54px); font-weight: 650; letter-spacing: -.045em; line-height: 1.1; margin: 13px 0 9px; }
 h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025em; margin-top: 5px; }
-.date-line { align-items: center; color: var(--muted); display: flex; font-size: 13px; gap: 7px; justify-content: center; text-transform: capitalize; }
-.clock { color: var(--teal-dark); font-size: 28px; font-variant-numeric: tabular-nums; font-weight: 550; letter-spacing: .035em; margin-top: 11px; }
+.date-line { align-items: center; color: var(--muted); display: flex; font-size: 16px; gap: 8px; justify-content: center; text-transform: capitalize; }
+.date-line svg { height: 19px; width: 19px; }
+.clock { color: var(--teal-dark); font-size: 40px; font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: .035em; margin-top: 11px; }
 .timezone { color: var(--muted); font-size: 11px; margin-top: 3px; }
 .auto-refresh-note { color: var(--muted); font-size: 10px; margin-top: 6px; }
 .install-button {
@@ -159,12 +160,13 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .day-item span { color: var(--muted); font-size: 12px; text-transform: capitalize; }
 .day-weather { align-items: center; display: flex; gap: 5px; }
 .day-weather small { color: var(--muted); font-size: 11px; white-space: nowrap; }
-.day-weather.high-rain .rain-probability { background: rgba(255, 143, 143, .12); border-radius: 4px; color: #ffaaaa; padding: 3px 5px; }
+.day-weather .rain-probability { background: rgba(255, 50, 65, .18); border-radius: 4px; color: #ff4d5a; font-size: 12px; font-weight: 750; padding: 4px 6px; }
+.day-weather.high-rain .rain-probability { background: rgba(255, 50, 65, .25); color: #ff3547; }
 .day-item strong { color: var(--ink); font-size: 12px; font-weight: 570; text-align: right; white-space: nowrap; }
 .skeleton-block { display: grid; gap: 10px; }
 .skeleton-block span { animation: shimmer 1.4s infinite; background: linear-gradient(90deg, var(--surface-raised), #23334a, var(--surface-raised)); background-size: 200% 100%; border-radius: 6px; height: 42px; }
 
-.map-panel, .useful-sites { margin-top: 18px; }
+.satellite-panel, .useful-sites { margin-top: 18px; }
 .radar-links-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); margin-top: 18px; padding: 19px; }
 .radar-links-grid { display: grid; gap: 9px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .radar-link-card { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 7px; color: var(--ink); display: flex; gap: 10px; justify-content: space-between; min-height: 62px; padding: 10px 12px; text-decoration: none; transition: border-color .18s, background .18s; }
@@ -173,11 +175,25 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .radar-link-card strong { font-size: 12px; font-weight: 650; }
 .radar-link-card small { color: var(--muted); font-size: 10px; line-height: 1.45; }
 .radar-link-card svg { color: var(--teal); flex: 0 0 auto; }
-.map-frame { background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; min-height: 270px; overflow: hidden; position: relative; }
-.map { height: 100%; min-height: 270px; width: 100%; }
-.map-label { align-items: center; background: rgba(17, 28, 45, .92); border: 1px solid var(--line); border-radius: 5px; bottom: 10px; color: var(--ink); display: flex; font-size: 10px; gap: 5px; left: 10px; padding: 6px 8px; position: absolute; z-index: 500; }
-.map-label svg { color: var(--teal); }
-.map-loading, .map-placeholder { align-items: center; color: var(--muted); display: flex; flex-direction: column; font-size: 12px; gap: 10px; height: 100%; justify-content: center; min-height: 270px; text-align: center; }
+.satellite-panel:fullscreen { background: var(--page); height: 100%; margin: 0; overflow: auto; padding: 20px 24px; }
+.satellite-viewer { align-items: center; background: #080d15; border: 1px solid var(--line); border-radius: 8px; display: flex; justify-content: center; min-height: 300px; overflow: hidden; position: relative; }
+.satellite-image { display: block; height: min(68vh, 680px); max-height: 680px; object-fit: contain; width: 100%; }
+.satellite-error-indicator { background: rgba(8, 13, 21, .88); border: 1px solid var(--line); border-radius: 5px; bottom: 10px; color: var(--ink); font-size: 11px; left: 10px; padding: 7px 9px; position: absolute; }
+.satellite-error-indicator { border-color: rgba(255, 77, 90, .55); color: #ff777f; }
+.satellite-controls { align-items: center; display: flex; gap: 14px; justify-content: space-between; margin-top: 12px; }
+.satellite-attribution { color: var(--muted); font-size: 11px; }
+.satellite-buttons { display: flex; flex: 0 0 auto; gap: 8px; }
+.satellite-control-button { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); cursor: pointer; display: inline-flex; font: inherit; font-size: 11px; gap: 6px; min-height: 34px; padding: 0 10px; }
+.satellite-control-button:hover:not(:disabled) { border-color: var(--teal); }
+.satellite-control-button:disabled { cursor: not-allowed; opacity: .55; }
+.satellite-control-button svg { color: var(--teal); }
+.satellite-refreshing { animation: satellite-spin .8s linear infinite; }
+.satellite-timeline { accent-color: var(--teal); display: block; margin: 13px 0 5px; width: 100%; }
+.satellite-attribution { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; margin-top: 9px; }
+.satellite-attribution a { color: var(--teal); text-decoration: none; }
+.satellite-attribution a:hover { text-decoration: underline; }
+.satellite-panel:fullscreen .satellite-viewer { height: calc(100vh - 260px); }
+.satellite-panel:fullscreen .satellite-image { height: 100%; }
 
 .news-portals { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
 .news-panel { contain: layout paint; padding: 19px; }
@@ -256,7 +272,8 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric:not(:nth-child(3n+1)) { border-left: 0; padding-left: 0; }
   .metric:not(:nth-child(2n+1)) { border-left: 1px solid var(--line); padding-left: 12px; }
-  .map-frame, .map, .map-loading, .map-placeholder { min-height: 250px; }
+  .satellite-viewer { min-height: 250px; }
+  .satellite-image { height: min(62vh, 560px); }
   .radar-links-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .useful-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   footer { align-items: flex-start; flex-direction: column; gap: 7px; }
@@ -264,11 +281,17 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 @media (max-width: 560px) {
   .app-shell { padding: 0 12px 22px; }
   .hero-header { padding: 57px 4px 23px; }
+  .date-line { font-size: 14px; gap: 6px; }
+  .date-line svg { height: 17px; width: 17px; }
+  .clock { font-size: 36px; }
   .cache-reset-button { font-size: 11px; padding: 8px 9px; }
   .content-grid { gap: 12px; margin-top: 14px; }
   .panel, .useful-sites { border-radius: 10px; padding: 17px 14px; }
   .section-heading { gap: 8px; margin-bottom: 15px; }
   .section-heading h2 { font-size: 18px; }
+  .satellite-controls { align-items: flex-start; flex-direction: column; }
+  .satellite-buttons { width: 100%; }
+  .satellite-control-button { flex: 1; justify-content: center; }
   .weather-header-actions { gap: 6px; }
   .location-button { font-size: 10px; min-height: 34px; padding: 0 8px; }
   .icon-button { height: 34px; min-height: 34px; width: 34px; }
@@ -296,7 +319,7 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .day-item span { font-size: 11px; }
   .day-item strong { font-size: clamp(10px, 3.1vw, 12px); }
   .day-weather { gap: 4px; }
-  .day-weather small { font-size: 10px; }
+  .day-weather .rain-probability { font-size: 11px; padding: 4px 5px; }
   .news-portals { gap: 11px; grid-template-columns: minmax(0, 1fr); }
   .news-panel { padding: 16px 14px; }
   .news-heading { align-items: center; }

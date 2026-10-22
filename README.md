@@ -1,6 +1,6 @@
 # Hub Principal
 
-Dashboard pessoal de clima, previsão, cotações, mapa, notícias por categoria e links úteis.
+Dashboard pessoal de clima, previsão, cotações, imagens animadas de satélite, notícias por categoria e links úteis.
 
 Quando fica aberto, o painel recarrega automaticamente a cada 30 minutos para buscar a versão e os dados mais recentes. Se a aba estiver suspensa, ele recarrega ao voltar a ficar visível.
 
@@ -58,7 +58,8 @@ https://fadoco.github.io/Hub-Principal/
 ## Fontes externas
 
 - Open-Meteo: clima e previsão.
-- Nominatim/OpenStreetMap: localização e mapa.
+- INMET: animação das imagens GOES sobre o Brasil no produto Topo das Nuvens, com pré-carregamento dos próximos quadros.
+- Nominatim/OpenStreetMap: busca de localização.
 - AwesomeAPI: cotações USD/BRL e EUR/BRL.
 - Bing Notícias: manchetes via RSS no Cloudflare Worker; Google Notícias para busca externa.
 

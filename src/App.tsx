@@ -1,10 +1,9 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Compass, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Navigation, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Navigation, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind } from 'lucide-react'
 import './App.css'
 import CurrencyPanel from './CurrencyPanel'
 import NewsPanel from './NewsPanel'
-
-const WeatherMap = lazy(() => import('./WeatherMap'))
+import SatellitePanel from './SatellitePanel'
 
 type Coordinates = { latitude: number; longitude: number }
 type LocationInfo = Coordinates & { city: string; state: string; country: string }
@@ -164,41 +163,6 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
 
 function Metric({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: string; detail?: string; tone?: string }) {
   return <><div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>{label === 'Nuvens' && <CurrencyPanel />}</>
-}
-
-function DeferredWeatherMap({ coordinates }: { coordinates: Coordinates }) {
-  const frameRef = useRef<HTMLDivElement | null>(null)
-  const [shouldLoad, setShouldLoad] = useState(false)
-
-  useEffect(() => {
-    const frame = frameRef.current
-    if (!frame || !('IntersectionObserver' in window)) {
-      setShouldLoad(true)
-      return
-    }
-
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setShouldLoad(true)
-        observer.disconnect()
-      }
-    }, { rootMargin: '250px' })
-
-    observer.observe(frame)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <div className="map-frame" ref={frameRef}>
-      {shouldLoad ? (
-        <Suspense fallback={<div className="map-loading">Carregando mapa...</div>}>
-          <WeatherMap coordinates={coordinates} />
-        </Suspense>
-      ) : (
-        <div className="map-placeholder"><Compass size={28} /><span>O mapa será carregado quando esta seção estiver próxima.</span></div>
-      )}
-    </div>
-  )
 }
 
 function openSecondaryWindow(url: string) { const popup = window.open(url, '_blank', 'noopener,noreferrer,width=1280,height=900'); if (!popup) window.location.href = url }
@@ -542,7 +506,6 @@ function App() {
           <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
           <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
         </button>
-        <div className="eyebrow"><span className="live-dot" /> PAINEL PESSOAL DE INFORMAÇÕES</div>
         <h1>Hub Principal</h1>
         <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
         <LiveClock />
@@ -692,19 +655,7 @@ function App() {
         </section>
       </section>
 
-      <section className="panel map-panel">
-        <div className="section-heading">
-          <div><span className="section-kicker">SUA REGIÃO</span><h2>Mapa da sua localização</h2></div>
-        </div>
-
-        {location ? (
-          <DeferredWeatherMap coordinates={location} />
-        ) : (
-          <div className="map-frame">
-            <div className="map-placeholder"><Compass size={28} /><span>O mapa será centralizado<br />quando sua localização estiver disponível.</span></div>
-          </div>
-        )}
-      </section>
+      <SatellitePanel />
 
       <section className="radar-links-panel">
         <div className="useful-heading">
