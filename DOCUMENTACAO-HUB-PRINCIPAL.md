@@ -237,7 +237,7 @@ Busca notícias por categoria usando a URL `VITE_NEWS_API_URL`:
 - Animes
 - Mundo/internacional
 
-A API intermediária em `worker/index.js` consulta o RSS do Bing Notícias, permite apenas origens configuradas em `worker/wrangler.toml` e mantém cache por cinco minutos. O componente analisa o XML, mantém um cache de sessão, carrega os cards quando se aproximam da tela e permite tentar novamente.
+A API intermediária em `worker/index.js` consulta o RSS do Bing Notícias, permite apenas origens configuradas em `worker/wrangler.toml` e mantém cache por cinco minutos. O componente analisa o XML, exibe apenas manchetes dos últimos sete dias em ordem decrescente de data, mantém um cache de sessão, carrega os cards quando se aproximam da tela e permite tentar novamente. O portal global usa a busca `notícias mundo` para priorizar cobertura internacional em português.
 
 Se `VITE_NEWS_API_URL` não estiver configurada, os cards mantêm links diretos para as buscas no Google Notícias, sem tentar carregar manchetes dentro do Hub.
 

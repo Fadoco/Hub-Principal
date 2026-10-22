@@ -67,10 +67,15 @@ export default {
       return jsonResponse({ error: 'A news query between 1 and 160 characters is required.' }, 400, headers)
     }
 
+    const requestedMarket = requestUrl.searchParams.get('mkt') || 'pt-BR'
+    if (!['pt-BR', 'en-US'].includes(requestedMarket)) {
+      return jsonResponse({ error: 'Unsupported news market.' }, 400, headers)
+    }
+    const market = requestedMarket
     const feedUrl = new URL('https://www.bing.com/news/search')
     feedUrl.searchParams.set('q', query)
     feedUrl.searchParams.set('format', 'rss')
-    feedUrl.searchParams.set('mkt', 'pt-BR')
+    feedUrl.searchParams.set('mkt', market)
 
     const cacheKey = new Request(`${requestUrl.origin}/__feed-cache?${feedUrl.searchParams.toString()}`)
     const bypassCache = requestUrl.searchParams.get('refresh') === '1'

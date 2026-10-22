@@ -704,7 +704,7 @@ function App() {
         <NewsPanel locationCity={location?.city || null} title="Portal de noticias Jogos" query="jogos games lançamentos Nintendo PlayStation Xbox PC" />
         <NewsPanel locationCity={location?.city || null} title="Portal de noticias Filmes" query="filmes cinema streaming Netflix séries trailers" />
         <NewsPanel locationCity={location?.city || null} title="Portal de noticias Animes" query="animes mangás lançamentos temporada Crunchyroll" />
-        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Globais" query="notícias internacionais mundo" />
+        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Globais" query="notícias mundo" />
       </div>
 
       <UsefulSites />

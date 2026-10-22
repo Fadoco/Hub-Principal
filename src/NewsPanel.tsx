@@ -4,15 +4,21 @@ import { ExternalLink, Newspaper, RefreshCw } from 'lucide-react'
 type NewsItem = { title: string; link: string; pubDate: string; author?: string }
 type NewsPanelProps = { locationCity: string | null; title: string; query: string; local?: boolean }
 const NEWS_CACHE_TTL = 300000
-const NEWS_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
+const NEWS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+const NEWS_FUTURE_TOLERANCE_MS = 60 * 60 * 1000
 const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL?.trim()
 
 function normalizeNewsItems(items: NewsItem[]) {
   const latestAllowedTime = Date.now() - NEWS_MAX_AGE_MS
+  const latestAllowedFutureTime = Date.now() + NEWS_FUTURE_TOLERANCE_MS
   const unique = new Map<string, NewsItem>()
   items.filter((item) => {
     const publishedTime = Date.parse(item.pubDate)
-    return item.title && item.link && Number.isFinite(publishedTime) && publishedTime >= latestAllowedTime
+    return item.title
+      && item.link
+      && Number.isFinite(publishedTime)
+      && publishedTime >= latestAllowedTime
+      && publishedTime <= latestAllowedFutureTime
   }).forEach((item) => {
     const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
     if (!unique.has(key)) unique.set(key, item)
@@ -85,7 +91,7 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
           if (cached) {
             const saved = JSON.parse(cached) as { timestamp: number; items: NewsItem[] }
             if (Date.now() - saved.timestamp < NEWS_CACHE_TTL) {
-              setItems(saved.items)
+              setItems(normalizeNewsItems(saved.items))
               setError(false)
               return
             }
