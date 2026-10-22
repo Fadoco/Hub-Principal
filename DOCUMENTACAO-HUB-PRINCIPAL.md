@@ -30,7 +30,7 @@ O projeto tem uma estética "cyberpunk"/"command center", com fundo escuro, elem
 - OpenStreetMap / Nominatim: localização e tiles do mapa
 - Open-Meteo: previsão meteorológica
 - AwesomeAPI: cotações de moedas
-- Cloudflare Workers + Google News RSS: notícias
+- Cloudflare Workers + Bing Notícias RSS: notícias
 - manifest + service worker: PWA
 
 ### Estrutura de build
@@ -237,7 +237,7 @@ Busca notícias por categoria usando a URL `VITE_NEWS_API_URL`:
 - Animes
 - Mundo/internacional
 
-A API intermediária em `worker/index.js` consulta o RSS do Google Notícias, permite apenas origens configuradas em `worker/wrangler.toml` e mantém cache por cinco minutos. O componente analisa o XML, mantém um cache de sessão, carrega os cards quando se aproximam da tela e permite tentar novamente.
+A API intermediária em `worker/index.js` consulta o RSS do Bing Notícias, permite apenas origens configuradas em `worker/wrangler.toml` e mantém cache por cinco minutos. O componente analisa o XML, mantém um cache de sessão, carrega os cards quando se aproximam da tela e permite tentar novamente.
 
 Se `VITE_NEWS_API_URL` não estiver configurada, os cards mantêm links diretos para as buscas no Google Notícias, sem tentar carregar manchetes dentro do Hub.
 
@@ -357,7 +357,7 @@ O site depende de serviços fora do projeto:
 
 - Open-Meteo para clima
 - Nominatim para geolocalização reversa
-- Cloudflare Worker para buscar o RSS do Google Notícias
+- Cloudflare Worker para buscar o RSS do Bing Notícias
 - AwesomeAPI para cotações
 
 Isso significa que:
@@ -369,7 +369,7 @@ Isso significa que:
 A geolocalização exige permissões do usuário. Sem isso, a UI mostra mensagens de aviso.
 
 ### 11.3 API de notícias
-O Worker aceita somente requisições `GET` ao feed de notícias, valida o tamanho da busca e libera CORS apenas para as origens cadastradas em `ALLOWED_ORIGINS`. O cache reduz chamadas ao provedor; a disponibilidade do RSS do Google Notícias ainda depende do serviço externo.
+O Worker aceita somente requisições `GET` ao feed de notícias, valida o tamanho da busca e libera CORS apenas para as origens cadastradas em `ALLOWED_ORIGINS`. O cache reduz chamadas ao provedor; a disponibilidade do RSS do Bing Notícias ainda depende do serviço externo.
 
 ---
 

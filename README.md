@@ -13,7 +13,7 @@ Abra `http://127.0.0.1:5173/`.
 
 ## Notícias no Hub
 
-O frontend do GitHub Pages não consegue ler o RSS do Google Notícias diretamente por causa de CORS. O projeto inclui um Cloudflare Worker que busca o feed, limita a origem e a consulta, e mantém cache por cinco minutos.
+O frontend do GitHub Pages não consegue ler feeds de notícias diretamente por causa de CORS. O projeto inclui um Cloudflare Worker que busca o RSS de notícias do Bing, limita a origem e a consulta, e mantém cache por cinco minutos. Os links de busca dos cartões continuam abrindo o Google Notícias.
 
 1. Crie uma conta Cloudflare e autentique o Wrangler:
 
@@ -58,7 +58,7 @@ https://fadoco.github.io/Hub-Principal/
 - Open-Meteo: clima e previsão.
 - Nominatim/OpenStreetMap: localização e mapa.
 - AwesomeAPI: cotações USD/BRL e EUR/BRL.
-- Google Notícias: manchetes via RSS, usando o Cloudflare Worker.
+- Bing Notícias: manchetes via RSS no Cloudflare Worker; Google Notícias para busca externa.
 
 ## Comandos
 

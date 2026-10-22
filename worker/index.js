@@ -67,11 +67,10 @@ export default {
       return jsonResponse({ error: 'A news query between 1 and 160 characters is required.' }, 400, headers)
     }
 
-    const feedUrl = new URL('https://news.google.com/rss/search')
+    const feedUrl = new URL('https://www.bing.com/news/search')
     feedUrl.searchParams.set('q', query)
-    feedUrl.searchParams.set('hl', 'pt-BR')
-    feedUrl.searchParams.set('gl', 'BR')
-    feedUrl.searchParams.set('ceid', 'BR:pt-419')
+    feedUrl.searchParams.set('format', 'rss')
+    feedUrl.searchParams.set('mkt', 'pt-BR')
 
     const cacheKey = new Request(`${requestUrl.origin}/__feed-cache?${feedUrl.searchParams.toString()}`)
     const bypassCache = requestUrl.searchParams.get('refresh') === '1'
@@ -81,17 +80,21 @@ export default {
       if (cached) return withCors(cached, headers)
 
       const upstream = await fetch(feedUrl, {
-        headers: { Accept: 'application/rss+xml, application/xml;q=0.9' },
+        headers: {
+          Accept: 'application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (compatible; HubPrincipalNews/1.0)',
+        },
         signal: AbortSignal.timeout(10000),
       })
       if (!upstream.ok) {
-        console.error('Google News RSS returned an unsuccessful status.', upstream.status)
+        console.error('News RSS provider returned an unsuccessful status.', upstream.status, (await upstream.text()).slice(0, 200))
         return jsonResponse({ error: 'The news provider is temporarily unavailable.' }, 502, headers)
       }
 
       const feed = await upstream.text()
       if (!feed.includes('<rss') && !feed.includes('<feed')) {
-        console.error('Google News returned an unexpected feed response.')
+        console.error('News RSS provider returned an unexpected feed response.')
         return jsonResponse({ error: 'The news provider returned an invalid feed.' }, 502, headers)
       }
 
@@ -105,7 +108,7 @@ export default {
       context.waitUntil(caches.default.put(cacheKey, feedResponse.clone()))
       return withCors(feedResponse, headers)
     } catch (error) {
-      console.error('Unable to retrieve Google News RSS.', error)
+      console.error('Unable to retrieve news RSS.', error)
       return jsonResponse({ error: 'The news provider could not be reached.' }, 502, headers)
     }
   },

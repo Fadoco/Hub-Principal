@@ -4,11 +4,16 @@ import { ExternalLink, Newspaper, RefreshCw } from 'lucide-react'
 type NewsItem = { title: string; link: string; pubDate: string; author?: string }
 type NewsPanelProps = { locationCity: string | null; title: string; query: string; local?: boolean }
 const NEWS_CACHE_TTL = 300000
+const NEWS_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL?.trim()
 
 function normalizeNewsItems(items: NewsItem[]) {
+  const latestAllowedTime = Date.now() - NEWS_MAX_AGE_MS
   const unique = new Map<string, NewsItem>()
-  items.filter((item) => item.title && item.link).forEach((item) => {
+  items.filter((item) => {
+    const publishedTime = Date.parse(item.pubDate)
+    return item.title && item.link && Number.isFinite(publishedTime) && publishedTime >= latestAllowedTime
+  }).forEach((item) => {
     const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
     if (!unique.has(key)) unique.set(key, item)
   })
@@ -25,7 +30,8 @@ function parseNewsFeed(xml: string) {
     title: item.querySelector('title')?.textContent?.trim() || '',
     link: item.querySelector('link')?.textContent?.trim() || '',
     pubDate: item.querySelector('pubDate')?.textContent?.trim() || '',
-    author: item.getElementsByTagName('source')[0]?.textContent?.trim()
+    author: item.getElementsByTagName('News:Source')[0]?.textContent?.trim()
+      || item.getElementsByTagName('source')[0]?.textContent?.trim()
       || item.getElementsByTagName('dc:creator')[0]?.textContent?.trim(),
   }))
 
