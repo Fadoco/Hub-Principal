@@ -1,12 +1,13 @@
 ﻿import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
-import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Compass, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Navigation, Newspaper, RefreshCw, Sun, Sunrise, Sunset, Umbrella, Wind } from 'lucide-react'
+import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Compass, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Navigation, Newspaper, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind } from 'lucide-react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
 
 type Coordinates = { latitude: number; longitude: number }
 type LocationInfo = Coordinates & { city: string; state: string; country: string }
+type FavoriteLocationsState = { items: LocationInfo[]; error: string }
 type CitySuggestion = {
   label: string
   city: string
@@ -16,15 +17,16 @@ type CitySuggestion = {
   longitude: number
   searchKey: string
 }
-type WeatherData = { current: Record<string, number | string>; hourly: { time: string[]; temperature_2m: number[]; precipitation_probability: number[]; weather_code: number[] }; daily: { time: string[]; weather_code: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; sunrise: string[]; sunset: string[] } }
+type WeatherData = { current: Record<string, number | string>; hourly: { time: string[]; temperature_2m: number[]; precipitation: number[]; precipitation_probability: number[]; weather_code: number[] }; daily: { time: string[]; weather_code: number[]; precipitation_probability_max: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; sunrise: string[]; sunset: string[] } }
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const WEATHER_CACHE_TTL = 180000
 const CURRENCY_CACHE_TTL = 60000
+const FAVORITE_LOCATIONS_KEY = 'hub-favorite-locations'
 const radarPageUrl = 'https://www.ipmetradar.com.br/2mobileGis.php'
 const radarSources = [
   { label: 'Satélite meteorológico', description: 'Animação de imagens de satélite', url: 'https://www.ipmetradar.com.br/2satelite.php' },
   { label: 'Radar animado PPI', description: 'Animaçao das ultimas imagens', url: 'https://www.ipmetradar.com.br/2animRadar.php' },
-  { label: 'Imagem com cidades', description: 'Ultima imagem e municipios', url: 'https://www.ipmetradar.com.br/2imagemRadar.php' },
+  { label: 'Radar GIS Local', description: 'Radar GIS e cidades', url: 'https://www.ipmetradar.com.br/2mobileGis.php' },
   { label: 'Radar GIS satélite', description: 'Mapas GIS e imagens de satélite', url: 'https://www.ipmetradar.com.br/2satGis.php' },
 ]
 const usefulSites = [
@@ -41,6 +43,32 @@ const WeatherIcon = ({ code, size = 24 }: { code: number; size?: number }) => co
 const formatTime = (value: string | number | undefined) => value ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '--'
 const formatNumber = (value: string | number | undefined, suffix = '') => value === undefined || value === null ? '--' : `${Math.round(Number(value))}${suffix}`
 const formatDay = (value: string) => new Intl.DateTimeFormat('pt-BR', { weekday: 'short' }).format(new Date(`${value}T12:00:00`)).replace('.', '')
+const getLocationKey = (value: Coordinates) => `${value.latitude.toFixed(3)}:${value.longitude.toFixed(3)}`
+const isLocationInfo = (value: unknown): value is LocationInfo => {
+  if (!value || typeof value !== 'object') return false
+  const location = value as Partial<LocationInfo>
+  return typeof location.latitude === 'number' && typeof location.longitude === 'number' &&
+    typeof location.city === 'string' && typeof location.state === 'string' && typeof location.country === 'string'
+}
+const readFavoriteLocations = (): FavoriteLocationsState => {
+  try {
+    const saved = localStorage.getItem(FAVORITE_LOCATIONS_KEY)
+    if (!saved) return { items: [], error: '' }
+    const parsed: unknown = JSON.parse(saved)
+    if (!Array.isArray(parsed) || !parsed.every(isLocationInfo)) throw new Error('invalid-favorites')
+    return { items: parsed, error: '' }
+  } catch {
+    return { items: [], error: 'Não foi possível carregar as cidades favoritas salvas neste navegador.' }
+  }
+}
+const getUvGuidance = (uvIndex: number | undefined) => {
+  if (uvIndex === undefined || !Number.isFinite(uvIndex)) return null
+  if (uvIndex <= 2) return { level: 'Baixo', advice: 'Proteção geralmente não necessária', tone: 'low' }
+  if (uvIndex <= 5) return { level: 'Moderado', advice: 'Use proteção se ficar ao sol', tone: 'moderate' }
+  if (uvIndex <= 7) return { level: 'Alto', advice: 'Protetor, chapéu e sombra', tone: 'high' }
+  if (uvIndex <= 10) return { level: 'Muito alto', advice: 'Evite o sol entre 10h e 16h', tone: 'very-high' }
+  return { level: 'Extremo', advice: 'Evite exposição direta ao sol', tone: 'extreme' }
+}
 const stateAbbreviations: Record<string, string> = {
   acre: 'AC', alagoas: 'AL', amapá: 'AP', amazonas: 'AM', bahia: 'BA', ceará: 'CE',
   'distrito federal': 'DF', 'espírito santo': 'ES', goiás: 'GO', maranhão: 'MA',
@@ -261,8 +289,8 @@ function NewsPanel({ location, title, query, local = false }: NewsPanelProps) {
   return <section className="news-panel"><div className="news-heading"><div><span className="section-kicker">PORTAL DE NOTÍCIAS</span><h3>{title}</h3></div><a className="news-search" href={searchUrl} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openSecondaryWindow(searchUrl) }}><Newspaper size={15} /> Ver todas</a></div>{loading && !items.length ? <div className="news-empty">Buscando notícias...</div> : error && !items.length ? <div className="news-empty">Não foi possível atualizar as notícias agora.</div> : <div className="news-list">{items.map((item) => <a className="news-item" href={item.link} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openSecondaryWindow(item.link) }} key={item.link}><span><strong>{item.title}</strong><small>{item.author || 'Google News'} · {new Date(item.pubDate).toLocaleDateString('pt-BR')}</small></span><ExternalLink size={14} /></a>)}</div>}</section>
 }
 
-function Metric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail?: string }) {
-  return <><div className="metric"><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>{label === 'Nuvens' && <CurrencyPanel />}</>
+function Metric({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: string; detail?: string; tone?: string }) {
+  return <><div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>{label === 'Nuvens' && <CurrencyPanel />}</>
 }
 
 function openRadarWindow(url: string) { window.open(url, '_blank', 'noopener,noreferrer,width=1280,height=900') }
@@ -323,7 +351,9 @@ async function resetSiteCache() {
     await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
   }
 
-  localStorage.clear()
+  for (const key of Object.keys(localStorage)) {
+    if (key !== FAVORITE_LOCATIONS_KEY) localStorage.removeItem(key)
+  }
   sessionStorage.clear()
   window.location.reload()
 }
@@ -337,11 +367,42 @@ function App() {
   const [weatherError, setWeatherError] = useState('')
   const [loadingWeather, setLoadingWeather] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [favoriteLocations, setFavoriteLocations] = useState<FavoriteLocationsState>(readFavoriteLocations)
   const [isCityModalOpen, setIsCityModalOpen] = useState(false)
   const [cityQuery, setCityQuery] = useState('')
   const [cityLookupError, setCityLookupError] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [selectedCitySuggestion, setSelectedCitySuggestion] = useState<CitySuggestion | null>(null)
+  const isCurrentLocationFavorite = Boolean(location && favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(location)))
+
+  const updateFavoriteLocations = (items: LocationInfo[]) => {
+    try {
+      localStorage.setItem(FAVORITE_LOCATIONS_KEY, JSON.stringify(items))
+      setFavoriteLocations({ items, error: '' })
+    } catch {
+      setFavoriteLocations({ items, error: 'Não foi possível salvar as favoritas no navegador. Elas ficarão disponíveis somente até fechar esta página.' })
+    }
+  }
+
+  const toggleCurrentLocationFavorite = () => {
+    if (!location) return
+    const locationKey = getLocationKey(location)
+    const nextFavorites = isCurrentLocationFavorite
+      ? favoriteLocations.items.filter((favorite) => getLocationKey(favorite) !== locationKey)
+      : [...favoriteLocations.items, location]
+    updateFavoriteLocations(nextFavorites)
+  }
+
+  const selectFavoriteLocation = (favorite: LocationInfo) => {
+    setLocation(favorite)
+    setIsCityModalOpen(false)
+    setCityLookupError('')
+  }
+
+  const removeFavoriteLocation = (favorite: LocationInfo) => {
+    const locationKey = getLocationKey(favorite)
+    updateFavoriteLocations(favoriteLocations.items.filter((item) => getLocationKey(item) !== locationKey))
+  }
 
   useEffect(() => {
     const trimmed = cityQuery.trim()
@@ -491,10 +552,10 @@ function App() {
         timezone: 'auto',
         forecast_days: '6',
         current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,cloud_cover,uv_index',
-        hourly: 'temperature_2m,precipitation_probability,weather_code',
-        daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset',
+        hourly: 'temperature_2m,precipitation,precipitation_probability,weather_code',
+        daily: 'weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min,sunrise,sunset',
       })
-      const cacheKey = `hub-weather:${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`
+      const cacheKey = `hub-weather-v3:${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`
       const cached = sessionStorage.getItem(cacheKey)
       if (cached) {
         const saved = JSON.parse(cached) as { timestamp: number; weather: WeatherData }
@@ -528,7 +589,28 @@ function App() {
 
   const current = weather?.current
   const currentCode = Number(current?.weather_code || 0)
+  const uvIndex = typeof current?.uv_index === 'number' ? current.uv_index : undefined
+  const uvGuidance = getUvGuidance(uvIndex)
   const hourlyIndexes = useMemo(() => weather?.hourly.time.map((time, index) => ({ time, index })).filter(({ time }) => new Date(time) >= now).slice(0, 6) || [], [weather, now])
+  const forecastNow = typeof current?.time === 'string' ? current.time : now.toISOString().slice(0, 16)
+  const futureHourlyIndexes = weather?.hourly.time
+    .map((time, index) => ({ time, index }))
+    .filter(({ time }) => time >= forecastNow) || []
+  const todayHourlyIndexes = futureHourlyIndexes.filter(({ time }) => time.slice(0, 10) === forecastNow.slice(0, 10))
+  const highestRainChanceToday = todayHourlyIndexes.reduce<{ time: string; probability: number } | null>((highest, { time, index }) => {
+    const probability = weather?.hourly.precipitation_probability[index]
+    if (typeof probability !== 'number' || (highest && highest.probability >= probability)) return highest
+    return { time, probability }
+  }, null)
+  const heavyRainForecast = futureHourlyIndexes.slice(0, 24).find(({ index }) => {
+    const probability = weather?.hourly.precipitation_probability[index]
+    const precipitation = weather?.hourly.precipitation[index]
+    const code = weather?.hourly.weather_code[index] || 0
+    return typeof probability === 'number' && probability >= 70 && (
+      (typeof precipitation === 'number' && precipitation >= 10) ||
+      code === 65 || code === 82 || code >= 95
+    )
+  })
   const daily = weather?.daily.time.slice(0, 5) || []
   const dateText = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(now)
   const isUsingCustomLocation = currentLocation && location ? (Math.abs(location.latitude - currentLocation.latitude) > 0.01 || Math.abs(location.longitude - currentLocation.longitude) > 0.01) : false
@@ -562,11 +644,27 @@ function App() {
             </div>
           </div>
 
+          {weather && lastUpdated && (
+            <p className="weather-updated">
+              Clima atualizado às {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+
           {location ? (
             <div className="location-line">
               <MapPin size={16} />
               <span>{formatLocationLabel(location)}</span>
               <span className="location-status"><LocateFixed size={13} /> {currentLocation && location && Math.abs(location.latitude - currentLocation.latitude) < 0.01 && Math.abs(location.longitude - currentLocation.longitude) < 0.01 ? 'GPS' : 'Local customizado'}</span>
+              <button
+                className={`favorite-toggle${isCurrentLocationFavorite ? ' is-favorite' : ''}`}
+                type="button"
+                onClick={toggleCurrentLocationFavorite}
+                title={isCurrentLocationFavorite ? 'Remover dos favoritos' : 'Salvar cidade favorita'}
+                aria-label={isCurrentLocationFavorite ? 'Remover cidade dos favoritos' : 'Salvar cidade nos favoritos'}
+                aria-pressed={isCurrentLocationFavorite}
+              >
+                <Star size={16} fill={isCurrentLocationFavorite ? 'currentColor' : 'none'} />
+              </button>
             </div>
           ) : (
             <div className="notice"><LocateFixed size={16} /> {locationError || 'Solicitando sua localização...'}</div>
@@ -576,6 +674,7 @@ function App() {
             <button className="location-override-button" type="button" onClick={backToCurrentLocation}>volta para localização atual</button>
           )}
 
+          {favoriteLocations.error && <div className="notice error"><AlertCircle size={16} /> {favoriteLocations.error}</div>}
           {weatherError && <div className="notice error"><AlertCircle size={16} /> {weatherError}</div>}
           {loadingWeather && !weather && <div className="skeleton-block"><span /><span /><span /></div>}
 
@@ -598,6 +697,7 @@ function App() {
                 <Metric icon={<Eye />} label="Visibilidade" value={formatNumber(current?.visibility, ' m')} />
                 <Metric icon={<Sunrise />} label="Nascer do sol" value={formatTime(weather?.daily.sunrise[0])} />
                 <Metric icon={<Sunset />} label="Pôr do sol" value={formatTime(weather?.daily.sunset[0])} />
+                <Metric icon={<Sun />} label="Índice UV" value={formatNumber(uvIndex)} detail={uvGuidance ? `${uvGuidance.level} · ${uvGuidance.advice}` : 'Sem dados de UV'} tone={uvGuidance?.tone} />
                 <Metric icon={<Activity />} label="Nuvens" value={formatNumber(current?.cloud_cover, '%')} />
               </div>
             </>
@@ -614,6 +714,28 @@ function App() {
             <Navigation size={18} className="muted-icon" />
           </div>
 
+          {highestRainChanceToday && (
+            <div className="rain-summary">
+              <CloudRain size={17} />
+              <p>
+                <strong>Resumo de hoje</strong>
+                {highestRainChanceToday.probability > 0
+                  ? `Maior chance de chuva: ${formatNumber(highestRainChanceToday.probability, '%')} às ${formatTime(highestRainChanceToday.time)}.`
+                  : 'Sem chuva prevista para hoje.'}
+              </p>
+            </div>
+          )}
+
+          {heavyRainForecast && (
+            <div className="heavy-rain-alert" role="status" aria-live="polite">
+              <AlertCircle size={17} />
+              <p>
+                <strong>Alerta de chuva forte</strong>
+                Possível às {formatTime(weather?.hourly.time[heavyRainForecast.index] || '')}, com {formatNumber(weather?.hourly.precipitation_probability[heavyRainForecast.index], '%')} de chance.
+              </p>
+            </div>
+          )}
+
           <div className="hourly-list">
             {hourlyIndexes.map(({ time, index }) => (
               <div className="hour-item" key={time}>
@@ -626,13 +748,23 @@ function App() {
           </div>
 
           <div className="daily-list">
-            {daily.map((day, index) => (
-              <div className="day-item" key={day}>
-                <span>{index === 0 ? 'Hoje' : index === 1 ? 'Amanhã' : formatDay(day)}</span>
-                <WeatherIcon code={weather?.daily.weather_code[index] || 0} size={21} />
-                <strong>{formatNumber(weather?.daily.temperature_2m_max[index], '°')} / {formatNumber(weather?.daily.temperature_2m_min[index], '°')}</strong>
-              </div>
-            ))}
+            {daily.map((day, index) => {
+              const rainProbability = weather?.daily.precipitation_probability_max[index]
+              return (
+                <div className="day-item" key={day}>
+                  <span>{index === 0 ? 'Hoje' : index === 1 ? 'Amanhã' : formatDay(day)}</span>
+                  <div
+                    className={typeof rainProbability === 'number' && rainProbability >= 50 ? 'day-weather high-rain' : 'day-weather'}
+                    title="Probabilidade máxima de chuva"
+                    aria-label={`Chance de chuva: ${formatNumber(rainProbability, '%')}`}
+                  >
+                    <WeatherIcon code={weather?.daily.weather_code[index] || 0} size={21} />
+                    <small className="rain-probability">{formatNumber(rainProbability, '%')} chuva</small>
+                  </div>
+                  <strong>{formatNumber(weather?.daily.temperature_2m_max[index], '°')} / {formatNumber(weather?.daily.temperature_2m_min[index], '°')}</strong>
+                </div>
+              )
+            })}
           </div>
         </section>
       </section>
@@ -695,7 +827,7 @@ function App() {
       <footer>
         <strong>Hub Principal</strong>
         <span>Dados meteorológicos fornecidos por serviços externos &middot; IPMet / Unesp</span>
-        <span>Fuso: {Intl.DateTimeFormat().resolvedOptions().timeZone}{lastUpdated ? ` &middot; Clima atualizado às ${lastUpdated.toLocaleTimeString('pt-BR')}` : ''}</span>
+        <span>Fuso: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
       </footer>
 
       {isCityModalOpen && (
@@ -705,6 +837,29 @@ function App() {
               <h3>Ver clima em outro local</h3>
               <button type="button" className="modal-close-button" onClick={() => setIsCityModalOpen(false)}>×</button>
             </div>
+            {favoriteLocations.items.length > 0 && (
+              <section className="favorite-locations" aria-label="Cidades favoritas">
+                <h4>Cidades favoritas</h4>
+                {favoriteLocations.items.map((favorite) => (
+                  <div className="favorite-location-row" key={getLocationKey(favorite)}>
+                    <button type="button" className="favorite-location-select" onClick={() => selectFavoriteLocation(favorite)}>
+                      <Star size={14} fill="currentColor" />
+                      <span>{formatLocationLabel(favorite)}</span>
+                      {location && getLocationKey(location) === getLocationKey(favorite) && <small>atual</small>}
+                    </button>
+                    <button
+                      type="button"
+                      className="favorite-location-remove"
+                      onClick={() => removeFavoriteLocation(favorite)}
+                      title={`Remover ${formatLocationLabel(favorite)} dos favoritos`}
+                      aria-label={`Remover ${formatLocationLabel(favorite)} dos favoritos`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </section>
+            )}
             <form onSubmit={searchCityWeather}>
               <label className="location-modal-label" htmlFor="city-search">Cidade</label>
               <input
