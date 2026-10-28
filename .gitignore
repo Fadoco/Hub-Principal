@@ -13,6 +13,15 @@ node_modules
 dist
 dist-ssr
 *.local
+apk/.gradle/
+apk/local.properties
+apk/build/
+apk/app/build/
+apk/app/src/main/assets/public/
+apk/app/src/main/assets/capacitor.config.json
+apk/app/src/main/assets/capacitor.plugins.json
+apk/capacitor-cordova-android-plugins/
+apk/Hub-Principal-debug.apk
 
 # Editor directories and files
 .vscode/*

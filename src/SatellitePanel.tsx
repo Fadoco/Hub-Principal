@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { handleExternalLink } from './openExternalUrl'
 import { Maximize, Pause, Play, RefreshCw } from 'lucide-react'
 
 type SatelliteDate = { sigla: string; nome: string }
@@ -328,7 +329,7 @@ export default function SatellitePanel() {
 
       <div className="satellite-attribution">
         <span>INMET · {lastUpdated ? `Atualizado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Imagens GOES'}</span>
-        <a href="https://satelite.inmet.gov.br/" target="_blank" rel="noopener noreferrer">Portal oficial do INMET</a>
+        <a href="https://satelite.inmet.gov.br/" target="_blank" rel="noopener noreferrer" onClick={(event) => handleExternalLink(event, 'https://satelite.inmet.gov.br/')}>Portal oficial do INMET</a>
       </div>
     </section>
   )

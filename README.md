@@ -6,6 +6,23 @@ Quando fica aberto, o painel atualiza os dados a cada 30 minutos sem recarregar 
 
 O modo TV organiza o clima e as imagens do satélite lado a lado. A animação do satélite pausa quando a aba ou o painel não estão visíveis e continua ao retornar.
 
+## Aplicativo Android
+
+O projeto Android usa Capacitor e fica na pasta `apk/`. Para sincronizar o site e abrir o projeto no Android Studio:
+
+```powershell
+npm run sync:android
+npm run open:android
+```
+
+Para gerar um APK de depuração no Windows, com Android SDK (incluindo a plataforma Android 36) e Java 21 ou superior instalados:
+
+```powershell
+npm run build:android
+```
+
+O arquivo será gerado em `apk/Hub-Principal-debug.apk` (e também em `apk/app/build/outputs/apk/debug/app-debug.apk`).
+
 ## Rodar localmente
 
 ```powershell

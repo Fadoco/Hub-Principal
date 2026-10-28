@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Newspaper, RefreshCw } from 'lucide-react'
+import { handleExternalLink } from './openExternalUrl'
 
 type NewsItem = { title: string; link: string; pubDate: string; author?: string }
 type NewsPanelProps = { locationCity: string | null; locationState?: string | null; title: string; query: string | string[]; local?: boolean }
@@ -235,7 +236,7 @@ export default function NewsPanel({ locationCity, locationState, title, query, l
               <Newspaper size={15} /> Aguardando localização
             </span>
           ) : (
-            <a className="news-search" href={searchUrl} target="_blank" rel="noreferrer" aria-label={`Pesquisar "${searchQuery}" no Google Notícias`}>
+            <a className="news-search" href={searchUrl} target="_blank" rel="noreferrer" onClick={(event) => handleExternalLink(event, searchUrl)} aria-label={`Pesquisar "${searchQuery}" no Google Notícias`}>
               <Newspaper size={15} /> Ver todas
             </a>
           )}
@@ -256,7 +257,7 @@ export default function NewsPanel({ locationCity, locationState, title, query, l
       ) : (
         <div className="news-list">
           {items.map((item) => (
-            <a className="news-item" href={item.link} target="_blank" rel="noreferrer" key={item.link}>
+            <a className="news-item" href={item.link} target="_blank" rel="noreferrer" onClick={(event) => handleExternalLink(event, item.link)} key={item.link}>
               <span>
                 <strong>{item.title}</strong>
                 <small>

@@ -3,6 +3,7 @@ import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, Cl
 import './App.css'
 import CurrencyPanel from './CurrencyPanel'
 import NewsPanel from './NewsPanel'
+import { handleExternalLink } from './openExternalUrl'
 import SatellitePanel from './SatellitePanel'
 
 type Coordinates = { latitude: number; longitude: number }
@@ -179,13 +180,11 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
 }
 
 function Metric({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: string; detail?: string; tone?: string }) {
-  return <><div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>{label === 'Nuvens' && <CurrencyPanel />}</>
+  return <div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>
 }
 
-function openSecondaryWindow(url: string) { const popup = window.open(url, '_blank', 'noopener,noreferrer,width=1280,height=900'); if (!popup) window.location.href = url }
-
 function UsefulSites() {
-  return <section className="useful-sites"><div className="useful-heading"><div><span className="section-kicker">ATALHOS RÁPIDOS</span><h2>Sites úteis</h2></div><span className="useful-count">{usefulSites.length} serviços</span></div><div className="useful-grid">{usefulSites.map((site) => <a className="useful-card" href={site.url} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); openSecondaryWindow(site.url) }} key={site.url}><span><strong>{site.label}</strong><small>{site.description}</small></span><ExternalLink size={16} /></a>)}</div></section>
+  return <section className="useful-sites"><div className="useful-heading"><div><span className="section-kicker">ATALHOS RÁPIDOS</span><h2>Sites úteis</h2></div><span className="useful-count">{usefulSites.length} serviços</span></div><div className="useful-grid">{usefulSites.map((site) => <a className="useful-card" href={site.url} target="_blank" rel="noreferrer" onClick={(event) => handleExternalLink(event, site.url)} key={site.url}><span><strong>{site.label}</strong><small>{site.description}</small></span><ExternalLink size={16} /></a>)}</div></section>
 }
 
 function normalizeVisibleEscapes(root: HTMLElement) {
@@ -636,6 +635,7 @@ function App() {
                 <Metric icon={<Sun />} label="Índice UV" value={formatNumber(uvIndex)} detail={uvGuidance ? `${uvGuidance.level} · ${uvGuidance.advice}` : 'Sem dados de UV'} tone={uvGuidance?.tone} />
                 <Metric icon={<Activity />} label="Nuvens" value={formatNumber(current?.cloud_cover, '%')} />
               </div>
+              <CurrencyPanel />
             </>
           )}
 
@@ -713,7 +713,7 @@ function App() {
         </div>
         <div className="radar-links-grid">
           {radarSources.map((source) => (
-            <a className="radar-link-card" href={source.url} target="_blank" rel="noopener noreferrer" key={source.url}>
+            <a className="radar-link-card" href={source.url} target="_blank" rel="noopener noreferrer" onClick={(event) => handleExternalLink(event, source.url)} key={source.url}>
               <span><strong>{source.label}</strong><small>{source.description}</small></span>
               <ExternalLink size={16} />
             </a>
