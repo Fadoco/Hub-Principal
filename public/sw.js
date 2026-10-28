@@ -1,10 +1,12 @@
-const CACHE_NAME = 'hub-principal-shell-v4'
+const CACHE_NAME = 'hub-principal-shell-v5'
 const APP_SHELL_URL = new URL('./index.html', self.registration.scope).href
 const APP_SHELL = [
   APP_SHELL_URL,
   new URL('./manifest.webmanifest', self.registration.scope).href,
-  new URL('./icon-192.svg', self.registration.scope).href,
-  new URL('./icon-512.svg', self.registration.scope).href,
+  new URL('./favicon-96.png', self.registration.scope).href,
+  new URL('./apple-touch-icon.png', self.registration.scope).href,
+  new URL('./icon-192.png', self.registration.scope).href,
+  new URL('./icon-512.png', self.registration.scope).href,
 ]
 const STATIC_ASSET_PATTERN = /\.(?:css|js|svg|png|jpe?g|webp|ico|woff2?)$/i
 

@@ -54,8 +54,10 @@ Projeto Hub/
 ├─ public/
 │  ├─ manifest.webmanifest
 │  ├─ sw.js
-│  ├─ icon-192.svg
-│  └─ icon-512.svg
+│  ├─ favicon-96.png
+│  ├─ icon-192.png
+│  ├─ icon-512.png
+│  └─ apple-touch-icon.png
 ├─ docs/
 │  ├─ index.html
 │  ├─ manifest.webmanifest
@@ -335,8 +337,10 @@ O projeto registra um Service Worker em `public/sw.js`.
 
 ### Arquivos importantes
 - `manifest.webmanifest`
-- `icon-192.svg`
-- `icon-512.svg`
+- `favicon-96.png`
+- `icon-192.png`
+- `icon-512.png`
+- `apple-touch-icon.png`
 - `sw.js`
 
 Esse conjunto permite que o site seja "instalável" e tenha aparência de app nativo em alguns navegadores.
