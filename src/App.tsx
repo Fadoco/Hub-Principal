@@ -27,6 +27,13 @@ const radarSources = [
   { label: 'Radar GIS Local', description: 'Radar GIS e cidades', url: 'https://www.ipmetradar.com.br/2mobileGis.php' },
   { label: 'Radar GIS satélite', description: 'Mapa GIS com imagens de satélite', url: 'https://www.ipmetradar.com.br/2satGis.php' },
 ]
+const newsSearchQueries = {
+  games: ['jogos games', 'games lançamentos', 'notícias jogos'],
+  films: ['filmes cinema', 'notícias de cinema', 'filmes lançamento'],
+  anime: ['anime', 'animes notícias', 'anime lançamentos'],
+  geek: ['notícias geek', 'cultura pop geek', 'notícias nerd', 'cultura nerd'],
+  global: ['notícias mundo', 'notícias internacionais', 'notícias globais', 'notícias mundiais', 'mundo notícias', 'notícias exterior'],
+}
 const usefulSites = [
   { label: 'Remover fundo', description: 'Remova fundos de imagens', url: 'https://www.photoroom.com/pt-br/tools/background-remover' },
   { label: 'Gerenciador de PDF', description: 'Editar e organizar PDFs', url: 'https://www.ilovepdf.com/' },
@@ -83,6 +90,14 @@ const normalizeCityKey = (value: string) => value
   .toLowerCase()
   .replace(/\s+/g, ' ')
   .trim()
+const uniqueCitySuggestions = (suggestions: CitySuggestion[]) => {
+  const unique = new Map<string, CitySuggestion>()
+  suggestions.forEach((suggestion) => {
+    const key = `${suggestion.searchKey}:${suggestion.latitude}:${suggestion.longitude}`
+    if (!unique.has(key)) unique.set(key, suggestion)
+  })
+  return [...unique.values()]
+}
 
 const buildCitySuggestion = (result: any): CitySuggestion | null => {
   const countryName = result.address?.country || result.country || ''
@@ -140,7 +155,8 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
             })
             .filter(Boolean) as CitySuggestion[]
 
-          if (mappedSuggestions.length > 0) return mappedSuggestions.slice(0, 8)
+          const uniqueSuggestions = uniqueCitySuggestions(mappedSuggestions)
+          if (uniqueSuggestions.length > 0) return uniqueSuggestions.slice(0, 8)
         }
       }
     } catch {
@@ -154,10 +170,11 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
   const nominatimData = await nominatimResponse.json()
   if (!Array.isArray(nominatimData)) return []
 
-  return nominatimData
+  const suggestions = nominatimData
     .map(buildCitySuggestion)
     .filter((item): item is CitySuggestion => Boolean(item))
     .filter((item) => item.searchKey.includes(normalizeCityKey(trimmed)) || normalizeCityKey(trimmed).includes(item.searchKey) || item.searchKey === normalizeCityKey(trimmed))
+  return uniqueCitySuggestions(suggestions)
     .slice(0, 8)
 }
 
@@ -229,6 +246,7 @@ function App() {
   const [cityLookupError, setCityLookupError] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [selectedCitySuggestion, setSelectedCitySuggestion] = useState<CitySuggestion | null>(null)
+  const localNewsCity = location?.city === 'Localização atual' ? null : location?.city || null
   const isCurrentLocationFavorite = Boolean(location && favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(location)))
 
   useEffect(() => {
@@ -549,7 +567,7 @@ function App() {
               <h2>Clima agora</h2>
             </div>
             <div className="weather-header-actions">
-              <button className="location-button" type="button" onClick={openLocationModal}>ver clima em outro local</button>
+              <button className="location-button" type="button" onClick={openLocationModal}>Ver clima em outro local</button>
               <button className="icon-button" title="Atualizar clima" onClick={() => location && loadWeather(location)} disabled={loadingWeather}>
                 <RefreshCw size={17} className={loadingWeather ? 'spin' : ''} />
               </button>
@@ -583,7 +601,7 @@ function App() {
           )}
 
           {isUsingCustomLocation && (
-            <button className="location-override-button" type="button" onClick={backToCurrentLocation}>volta para localização atual</button>
+            <button className="location-override-button" type="button" onClick={backToCurrentLocation}>Voltar à localização atual</button>
           )}
 
           {favoriteLocations.error && <div className="notice error"><AlertCircle size={16} /> {favoriteLocations.error}</div>}
@@ -704,11 +722,12 @@ function App() {
       </section>
 
       <div className="news-portals">
-        <NewsPanel locationCity={location?.city || null} local title={location ? `Portal de noticias - ${location.city}` : 'Portal de noticias locais'} query="noticias" />
-        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Jogos" query="jogos games lançamentos Nintendo PlayStation Xbox PC" />
-        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Filmes" query="filmes cinema streaming Netflix séries trailers" />
-        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Animes" query="animes mangás lançamentos temporada Crunchyroll" />
-        <NewsPanel locationCity={location?.city || null} title="Portal de noticias Globais" query="notícias mundo" />
+        <NewsPanel locationCity={localNewsCity} local title={localNewsCity ? `Notícias de ${localNewsCity}` : 'Notícias da sua região'} query="notícias locais" />
+        <NewsPanel locationCity={location?.city || null} title="Portal de notícias de jogos" query={newsSearchQueries.games} />
+        <NewsPanel locationCity={location?.city || null} title="Portal de notícias de filmes e cinema" query={newsSearchQueries.films} />
+        <NewsPanel locationCity={location?.city || null} title="Portal de notícias de animes" query={newsSearchQueries.anime} />
+        <NewsPanel locationCity={location?.city || null} title="Portal de notícias do mundo geek" query={newsSearchQueries.geek} />
+        <NewsPanel locationCity={location?.city || null} title="Portal de notícias globais" query={newsSearchQueries.global} />
       </div>
 
       <UsefulSites />

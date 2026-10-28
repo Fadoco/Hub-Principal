@@ -223,15 +223,16 @@ Exibe:
 ### 6.4 `NewsPanel`
 Busca notícias por categoria usando a URL `VITE_NEWS_API_URL`:
 
-- Notícias locais
-- Jogos
-- Filmes
+- Notícias da cidade ou região atual
+- Jogos e games
+- Filmes e cinema
 - Animes
-- Mundo/internacional
+- Mundo geek e nerd
+- Notícias globais
 
-A API intermediária em `worker/index.js` consulta o RSS do Bing Notícias, permite apenas origens configuradas em `worker/wrangler.toml` e mantém cache por cinco minutos. O componente analisa o XML, exibe apenas manchetes dos últimos sete dias em ordem decrescente de data, mantém um cache de sessão, carrega os cards quando se aproximam da tela e permite tentar novamente. O portal global usa a busca `notícias mundo` para priorizar cobertura internacional em português.
+A API intermediária em `worker/index.js` consulta o RSS do Bing Notícias, permite apenas origens configuradas em `worker/wrangler.toml` e mantém cache por cinco minutos. O componente analisa o XML e reúne buscas alternativas de cada categoria para exibir até sete manchetes únicas dos últimos 30 dias, em ordem decrescente de data. Mantém um cache de sessão, carrega os cards quando se aproximam da tela e permite tentar novamente.
 
-Se `VITE_NEWS_API_URL` não estiver configurada, os cards mantêm links diretos para as buscas no Google Notícias, sem tentar carregar manchetes dentro do Hub.
+O portal local usa a cidade identificada pela localização atual ou escolhida no painel de clima. As buscas do feed usam termos simples separados por espaço, pois o provedor RSS não interpreta o operador `OR` de modo confiável. Os links de cada portal abrem a busca correspondente no Google Notícias em uma nova aba, mantendo o Hub aberto. Sem cidade disponível, a busca local aguarda a localização em vez de mostrar resultados genéricos. Se `VITE_NEWS_API_URL` não estiver configurada, os cards mantêm esses links diretos, sem tentar carregar manchetes dentro do Hub.
 
 Funções relevantes:
 - `normalizeNewsItems`: remove duplicados e ordena por data

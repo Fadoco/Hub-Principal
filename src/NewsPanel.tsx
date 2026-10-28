@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Newspaper, RefreshCw } from 'lucide-react'
 
 type NewsItem = { title: string; link: string; pubDate: string; author?: string }
-type NewsPanelProps = { locationCity: string | null; title: string; query: string; local?: boolean }
+type NewsPanelProps = { locationCity: string | null; title: string; query: string | string[]; local?: boolean }
 const NEWS_CACHE_TTL = 300000
-const NEWS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+const NEWS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
 const NEWS_FUTURE_TOLERANCE_MS = 60 * 60 * 1000
+const NEWS_ITEMS_LIMIT = 7
 const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL?.trim()
 
 function normalizeNewsItems(items: NewsItem[]) {
@@ -25,7 +26,7 @@ function normalizeNewsItems(items: NewsItem[]) {
   })
   return [...unique.values()]
     .sort((first, second) => new Date(second.pubDate).getTime() - new Date(first.pubDate).getTime())
-    .slice(0, 8)
+    .slice(0, NEWS_ITEMS_LIMIT)
 }
 
 function parseNewsFeed(xml: string) {
@@ -53,7 +54,19 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
   const [retryToken, setRetryToken] = useState(0)
   const forceRefreshRef = useRef(false)
 
-  const searchQuery = local && locationCity ? `${locationCity} notícias` : query
+  const searchQueries = useMemo(() => {
+    if (local && locationCity) {
+      return [
+        `Notícias ${locationCity}`,
+        `${locationCity} notícias`,
+        `notícias da região de ${locationCity}`,
+        `${locationCity} cidade notícias`,
+        locationCity,
+      ]
+    }
+    return Array.isArray(query) ? [...query] : [query]
+  }, [local, locationCity, query])
+  const searchQuery = searchQueries[0]
   const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(searchQuery)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
 
   useEffect(() => {
@@ -81,7 +94,7 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
     const forceRefresh = forceRefreshRef.current
     forceRefreshRef.current = false
     let activeController: AbortController | null = null
-    const cacheKey = `hub-news:${searchQuery}`
+    const cacheKey = `hub-news:${searchQueries.join('|')}`
 
     const loadNews = async () => {
       if (activeController) return
@@ -90,8 +103,9 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
           const cached = sessionStorage.getItem(cacheKey)
           if (cached) {
             const saved = JSON.parse(cached) as { timestamp: number; items: NewsItem[] }
-            if (Date.now() - saved.timestamp < NEWS_CACHE_TTL) {
-              setItems(normalizeNewsItems(saved.items))
+            const cachedItems = normalizeNewsItems(saved.items)
+            if (Date.now() - saved.timestamp < NEWS_CACHE_TTL && cachedItems.length === NEWS_ITEMS_LIMIT) {
+              setItems(cachedItems)
               setError(false)
               return
             }
@@ -107,27 +121,41 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
       const timeout = window.setTimeout(() => {
         timedOut = true
         controller.abort()
-      }, 12000)
+      }, 30000)
       setLoading(true)
       try {
-        const endpoint = new URL(NEWS_API_URL)
-        endpoint.searchParams.set('q', searchQuery)
-        if (forceRefresh) endpoint.searchParams.set('refresh', '1')
-        const response = await fetch(endpoint, {
-          signal: controller.signal,
-          cache: forceRefresh ? 'no-store' : 'default',
-        })
-        if (!response.ok) throw new Error(`Falha ao carregar notícias (HTTP ${response.status}).`)
+        const collectedItems: NewsItem[] = []
+        let successfulQueries = 0
+        for (const newsQuery of searchQueries) {
+          try {
+            const endpoint = new URL(NEWS_API_URL)
+            endpoint.searchParams.set('q', newsQuery)
+            if (forceRefresh) endpoint.searchParams.set('refresh', '1')
+            const response = await fetch(endpoint, {
+              signal: controller.signal,
+              cache: forceRefresh ? 'no-store' : 'default',
+            })
+            if (!response.ok) throw new Error(`Falha ao carregar notícias (HTTP ${response.status}).`)
+            const queryItems = parseNewsFeed(await response.text())
+            successfulQueries += 1
+            collectedItems.push(...queryItems)
+            if (normalizeNewsItems(collectedItems).length === NEWS_ITEMS_LIMIT) break
+          } catch (queryError) {
+            if ((queryError as Error).name === 'AbortError') throw queryError
+            console.error(`Não foi possível carregar notícias para a busca "${newsQuery}".`, queryError)
+          }
+        }
 
-        const nextItems = parseNewsFeed(await response.text())
-        if (!nextItems.length) throw new Error('O feed não retornou notícias para esta busca.')
+        const nextItems = normalizeNewsItems(collectedItems)
         if (!cancelled) {
           setItems(nextItems)
-          setError(false)
-          try {
-            sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: nextItems }))
-          } catch (storageError) {
-            console.warn('Não foi possível salvar o cache de notícias desta sessão.', storageError)
+          setError(successfulQueries === 0)
+          if (successfulQueries > 0) {
+            try {
+              sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: nextItems }))
+            } catch (storageError) {
+              console.warn('Não foi possível salvar o cache de notícias desta sessão.', storageError)
+            }
           }
         }
       } catch (loadError) {
@@ -150,7 +178,7 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
       window.clearTimeout(schedule)
       window.clearInterval(timer)
     }
-  }, [isNearViewport, locationCity, searchQuery, local, retryToken])
+  }, [isNearViewport, locationCity, searchQueries, local, retryToken])
 
   const refreshNews = () => {
     forceRefreshRef.current = true
@@ -169,16 +197,22 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
   return (
     <section className="news-panel" ref={panelRef}>
       <div className="news-heading">
-        <div><span className="section-kicker">PORTAL DE NOTÍCIAS</span><h3>{title}</h3></div>
+        <div><span className="section-kicker">{local ? 'PORTAL DE NOTÍCIAS LOCAL' : 'PORTAL DE NOTÍCIAS'}</span><h3>{title}</h3></div>
         <div className="news-actions">
           {NEWS_API_URL && (
             <button className="news-retry" type="button" onClick={refreshNews} disabled={loading || (local && !locationCity)}>
               <RefreshCw size={13} className={loading ? 'spin' : ''} /> Atualizar
             </button>
           )}
-          <a className="news-search" href={searchUrl} target="_blank" rel="noreferrer">
-            <Newspaper size={15} /> Ver todas
-          </a>
+          {local && !locationCity ? (
+            <span className="news-search is-disabled" aria-disabled="true">
+              <Newspaper size={15} /> Aguardando localização
+            </span>
+          ) : (
+            <a className="news-search" href={searchUrl} target="_blank" rel="noreferrer" aria-label={`Pesquisar "${searchQuery}" no Google Notícias`}>
+              <Newspaper size={15} /> Ver todas
+            </a>
+          )}
         </div>
       </div>
       {!NEWS_API_URL && (
@@ -190,7 +224,7 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
       ) : error && !items.length ? (
         <div className="news-empty">Nenhuma notícia disponível no momento.</div>
       ) : local && !locationCity ? (
-        <div className="news-empty">Defina uma localização para buscar notícias locais.</div>
+        <div className="news-empty">Permita o acesso à localização ou escolha uma cidade no painel de clima para buscar notícias locais.</div>
       ) : !NEWS_API_URL ? null : !isNearViewport ? (
         <div className="news-empty">As notícias serão carregadas ao chegar nesta seção.</div>
       ) : (
@@ -201,7 +235,10 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
               <ExternalLink size={14} />
             </a>
           ))}
-          {!items.length && !loading && !error && <div className="news-empty">Nenhuma notícia encontrada.</div>}
+          {!items.length && !loading && !error && <div className="news-empty">Nenhuma notícia encontrada nos últimos 30 dias.</div>}
+          {items.length > 0 && items.length < NEWS_ITEMS_LIMIT && !loading && (
+            <div className="news-empty">Encontramos {items.length} de {NEWS_ITEMS_LIMIT} notícias recentes para esta categoria.</div>
+          )}
         </div>
       )}
     </section>

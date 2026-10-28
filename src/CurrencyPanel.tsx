@@ -58,7 +58,7 @@ export default function CurrencyPanel() {
     <section className="currency-panel">
       <div className="currency-heading">
         <div><span className="section-kicker">MERCADO EM TEMPO REAL</span><h3>Cotações</h3></div>
-        <span className="currency-live"><span className="live-dot" /> Atualiza a cada 1 min</span>
+        <span className="currency-live"><span className="live-dot" /> Atualização a cada minuto</span>
       </div>
       {error && !quotes ? (
         <div className="currency-error">Cotações temporariamente indisponíveis. Tentaremos novamente.</div>

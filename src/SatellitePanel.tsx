@@ -272,7 +272,7 @@ export default function SatellitePanel() {
   return (
     <section className="panel satellite-panel" ref={panelRef}>
       <div className="section-heading">
-        <div><h2>Imagens de Satélite</h2></div>
+        <div><h2>Imagens de satélite</h2></div>
       </div>
 
       <div className="satellite-viewer" aria-busy={isLoading}>
