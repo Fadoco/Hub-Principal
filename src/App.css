@@ -278,6 +278,8 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .news-item > span { display: grid; gap: 5px; min-width: 0; }
 .news-item strong { display: -webkit-box; font-size: 12px; font-weight: 600; line-height: 1.45; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .news-item small { color: var(--muted); font-size: 10px; }
+.news-item time { color: var(--teal-dark); white-space: nowrap; }
+.news-new-badge { background: rgba(99, 214, 207, .14); border: 1px solid rgba(99, 214, 207, .32); border-radius: 999px; color: var(--teal-dark); font-size: 9px; font-weight: 750; line-height: 1.2; padding: 2px 6px; text-transform: uppercase; }
 .news-item svg { color: var(--muted); flex: 0 0 auto; }
 .news-empty { color: var(--muted); font-size: 12px; padding: 11px 0; }
 .news-info { background: rgba(99, 214, 207, .08); border-radius: 5px; color: var(--ink); font-size: 11px; line-height: 1.55; margin-bottom: 8px; padding: 8px; }

@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Newspaper, RefreshCw } from 'lucide-react'
 
 type NewsItem = { title: string; link: string; pubDate: string; author?: string }
-type NewsPanelProps = { locationCity: string | null; title: string; query: string | string[]; local?: boolean }
+type NewsPanelProps = { locationCity: string | null; locationState?: string | null; title: string; query: string | string[]; local?: boolean }
 const NEWS_CACHE_TTL = 300000
 const NEWS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
 const NEWS_FUTURE_TOLERANCE_MS = 60 * 60 * 1000
 const NEWS_ITEMS_LIMIT = 7
+const NEWS_NEW_BADGE_AGE_MS = 24 * 60 * 60 * 1000
 const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL?.trim()
 
 function normalizeNewsItems(items: NewsItem[]) {
@@ -45,7 +46,31 @@ function parseNewsFeed(xml: string) {
   return normalizeNewsItems(items)
 }
 
-export default function NewsPanel({ locationCity, title, query, local = false }: NewsPanelProps) {
+function formatRelativeDate(value: string) {
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return 'data indisponível'
+
+  const elapsedSeconds = Math.round((timestamp - Date.now()) / 1000)
+  if (Math.abs(elapsedSeconds) < 60) return 'agora'
+
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ['year', 60 * 60 * 24 * 365],
+    ['month', 60 * 60 * 24 * 30],
+    ['day', 60 * 60 * 24],
+    ['hour', 60 * 60],
+    ['minute', 60],
+  ]
+  const [unit, unitSeconds] = units.find(([, seconds]) => Math.abs(elapsedSeconds) >= seconds) || units[units.length - 1]
+  return new Intl.RelativeTimeFormat('pt-BR', { numeric: 'always' }).format(Math.round(elapsedSeconds / unitSeconds), unit)
+}
+
+function isNewNewsItem(value: string) {
+  const publishedTime = Date.parse(value)
+  const age = Date.now() - publishedTime
+  return Number.isFinite(publishedTime) && age >= 0 && age <= NEWS_NEW_BADGE_AGE_MS
+}
+
+export default function NewsPanel({ locationCity, locationState, title, query, local = false }: NewsPanelProps) {
   const panelRef = useRef<HTMLElement | null>(null)
   const [items, setItems] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -56,16 +81,17 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
 
   const searchQueries = useMemo(() => {
     if (local && locationCity) {
+      const region = [locationCity, locationState].filter(Boolean).join(' ')
       return [
-        `Notícias ${locationCity}`,
-        `${locationCity} notícias`,
-        `notícias da região de ${locationCity}`,
-        `${locationCity} cidade notícias`,
-        locationCity,
+        `Notícias ${region}`,
+        `${region} notícias`,
+        `notícias da região de ${region}`,
+        `${locationCity} cidade ${locationState || ''} notícias`.trim(),
+        region,
       ]
     }
     return Array.isArray(query) ? [...query] : [query]
-  }, [local, locationCity, query])
+  }, [local, locationCity, locationState, query])
   const searchQuery = searchQueries[0]
   const searchUrl = `https://news.google.com/search?q=${encodeURIComponent(searchQuery)}&hl=pt-BR&gl=BR&ceid=BR%3Apt-419`
 
@@ -231,7 +257,16 @@ export default function NewsPanel({ locationCity, title, query, local = false }:
         <div className="news-list">
           {items.map((item) => (
             <a className="news-item" href={item.link} target="_blank" rel="noreferrer" key={item.link}>
-              <span><strong>{item.title}</strong><small>{item.author || 'Google News'} · {new Date(item.pubDate).toLocaleDateString('pt-BR')}</small></span>
+              <span>
+                <strong>{item.title}</strong>
+                <small>
+                  {item.author || 'Google News'} ·
+                  <time dateTime={item.pubDate} title={new Date(item.pubDate).toLocaleString('pt-BR')}>
+                    {formatRelativeDate(item.pubDate)}
+                  </time>
+                  {isNewNewsItem(item.pubDate) && <span className="news-new-badge">Nova</span>}
+                </small>
+              </span>
               <ExternalLink size={14} />
             </a>
           ))}

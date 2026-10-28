@@ -722,7 +722,7 @@ function App() {
       </section>
 
       <div className="news-portals">
-        <NewsPanel locationCity={localNewsCity} local title={localNewsCity ? `Notícias de ${localNewsCity}` : 'Notícias da sua região'} query="notícias locais" />
+        <NewsPanel locationCity={localNewsCity} locationState={location?.state ? getStateAbbreviation(location.state) : null} local title={localNewsCity && location ? `Notícias de ${formatLocationLabel(location)}` : 'Notícias da sua região'} query="notícias locais" />
         <NewsPanel locationCity={location?.city || null} title="Portal de notícias de jogos" query={newsSearchQueries.games} />
         <NewsPanel locationCity={location?.city || null} title="Portal de notícias de filmes e cinema" query={newsSearchQueries.films} />
         <NewsPanel locationCity={location?.city || null} title="Portal de notícias de animes" query={newsSearchQueries.anime} />
