@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from 'react'
-import { Activity, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronUp, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, GripVertical, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, RotateCcw, Settings2, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
+import { Activity, AlertCircle, CalendarDays, ChevronLeft, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, GripVertical, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, RotateCcw, Settings2, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import './App.css'
 import CurrencyPanel from './CurrencyPanel'
 import NewsPanel from './NewsPanel'
@@ -277,62 +278,6 @@ function Metric({ icon, label, value, detail, tone }: { icon: ReactNode; label: 
   return <div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>
 }
 
-function HoldToMoveButton({ label, direction, disabled, onMove }: { label: string; direction: -1 | 1; disabled: boolean; onMove: () => void }) {
-  const delayTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pointerActivated = useRef(false)
-  const onMoveRef = useRef(onMove)
-
-  useEffect(() => {
-    onMoveRef.current = onMove
-  }, [onMove])
-
-  const stopRepeating = () => {
-    if (delayTimer.current) window.clearTimeout(delayTimer.current)
-    if (repeatTimer.current) window.clearInterval(repeatTimer.current)
-    delayTimer.current = null
-    repeatTimer.current = null
-  }
-
-  useEffect(() => stopRepeating, [])
-
-  const startRepeating = (event: PointerEvent<HTMLButtonElement>) => {
-    if (disabled || event.button !== 0) return
-    pointerActivated.current = true
-    event.currentTarget.setPointerCapture(event.pointerId)
-    onMoveRef.current()
-    delayTimer.current = window.setTimeout(() => {
-      repeatTimer.current = window.setInterval(() => onMoveRef.current(), 100)
-    }, 350)
-  }
-
-  const activateFromKeyboard = () => {
-    if (pointerActivated.current) {
-      pointerActivated.current = false
-      return
-    }
-    onMove()
-  }
-
-  return (
-    <button
-      type="button"
-      aria-label={`Mover ${label} ${direction < 0 ? 'para cima' : 'para baixo'}`}
-      disabled={disabled}
-      onPointerDown={startRepeating}
-      onPointerUp={stopRepeating}
-      onPointerCancel={() => {
-        stopRepeating()
-        pointerActivated.current = false
-      }}
-      onLostPointerCapture={stopRepeating}
-      onClick={activateFromKeyboard}
-    >
-      {direction < 0 ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-    </button>
-  )
-}
-
 function UsefulSites() {
   return <section className="useful-sites"><div className="useful-heading"><div><span className="section-kicker">ATALHOS RÁPIDOS</span><h2>Sites úteis</h2></div><span className="useful-count">{usefulSites.length} serviços</span></div><div className="useful-grid">{usefulSites.map((site) => <a className="useful-card" href={site.url} target="_blank" rel="noreferrer" onClick={(event) => handleExternalLink(event, site.url)} key={site.url}><span><strong>{site.label}</strong><small>{site.description}</small></span><ExternalLink size={16} /></a>)}</div></section>
 }
@@ -582,6 +527,8 @@ function App() {
   const [isCheckingAndroidUpdate, setIsCheckingAndroidUpdate] = useState(isAndroidApp())
   const [isDownloadingAndroidUpdate, setIsDownloadingAndroidUpdate] = useState(false)
   const [hasDownloadedAndroidUpdate, setHasDownloadedAndroidUpdate] = useState(false)
+  const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false)
+  const dismissedUpdateVersion = useRef<string | null>(null)
   const isAndroidApplication = isAndroidApp() || isAndroidPreview
   const mobilePreferences = mobilePreferenceState.value
   const localNewsCity = location?.city === 'Localização atual' ? null : location?.city || null
@@ -669,16 +616,31 @@ function App() {
     const appShell = document.querySelector<HTMLElement>('.android-app')
     let pointerY: number | null = null
     const reorderAt = (clientY: number) => {
-      const rows = Array.from(document.querySelectorAll<HTMLElement>('.preference-order-row[data-metric-id]'))
-      const otherMetrics = mobilePreferences.metricOrder.filter((metric) => metric !== draggedMetric)
-      const insertionIndex = otherMetrics.findIndex((metric) => {
-        const row = rows.find((item) => item.dataset.metricId === metric)
-        return row ? clientY < row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2 : false
-      })
-      const nextOrder = [...otherMetrics]
-      nextOrder.splice(insertionIndex < 0 ? nextOrder.length : insertionIndex, 0, draggedMetric)
-      if (nextOrder.some((metric, index) => metric !== mobilePreferences.metricOrder[index])) {
-        updateMobilePreferences({ metricOrder: nextOrder })
+      const currentOrder = mobilePreferencesRef.current.metricOrder
+      const draggedIndex = currentOrder.indexOf(draggedMetric)
+      if (draggedIndex < 0) return
+
+      const previousMetric = currentOrder[draggedIndex - 1]
+      if (previousMetric) {
+        const previousRow = document.querySelector<HTMLElement>(`.preference-order-row[data-metric-id="${previousMetric}"]`)
+        const previousBounds = previousRow?.getBoundingClientRect()
+        if (previousBounds && clientY < previousBounds.top + previousBounds.height / 2 - 8) {
+          const nextOrder = [...currentOrder]
+          ;[nextOrder[draggedIndex - 1], nextOrder[draggedIndex]] = [nextOrder[draggedIndex], nextOrder[draggedIndex - 1]]
+          updateMobilePreferences({ metricOrder: nextOrder })
+          return
+        }
+      }
+
+      const nextMetric = currentOrder[draggedIndex + 1]
+      if (nextMetric) {
+        const nextRow = document.querySelector<HTMLElement>(`.preference-order-row[data-metric-id="${nextMetric}"]`)
+        const nextBounds = nextRow?.getBoundingClientRect()
+        if (nextBounds && clientY > nextBounds.top + nextBounds.height / 2 + 8) {
+          const nextOrder = [...currentOrder]
+          ;[nextOrder[draggedIndex], nextOrder[draggedIndex + 1]] = [nextOrder[draggedIndex + 1], nextOrder[draggedIndex]]
+          updateMobilePreferences({ metricOrder: nextOrder })
+        }
       }
     }
 
@@ -690,7 +652,7 @@ function App() {
     const autoScrollTimer = window.setInterval(() => {
       if (!appShell || pointerY === null || appShell.scrollHeight <= appShell.clientHeight) return
       const bounds = appShell.getBoundingClientRect()
-      if (pointerY < bounds.top + 70) appShell.scrollTop -= 14
+      if (pointerY < bounds.top + 160) appShell.scrollTop -= 14
       else if (pointerY > bounds.bottom - 90) appShell.scrollTop += 14
       else return
       reorderAt(pointerY)
@@ -705,7 +667,7 @@ function App() {
       window.removeEventListener('pointerup', finishDragging)
       window.removeEventListener('pointercancel', finishDragging)
     }
-  }, [draggedMetric, mobilePreferences.metricOrder, updateMobilePreferences])
+  }, [draggedMetric, updateMobilePreferences])
   const resetMobilePreferences = () => {
     const defaults: MobilePreferences = {
       ...defaultMobilePreferences,
@@ -729,20 +691,10 @@ function App() {
     updateMobilePreferences({ visibleMetrics })
   }
 
-  const moveWeatherMetric = (metric: WeatherMetricId, direction: -1 | 1) => {
-    const index = mobilePreferences.metricOrder.indexOf(metric)
-    const nextIndex = index + direction
-    if (index < 0 || nextIndex < 0 || nextIndex >= mobilePreferences.metricOrder.length) return
-    const metricOrder = [...mobilePreferences.metricOrder]
-    const swappedMetric = metricOrder[index]
-    metricOrder[index] = metricOrder[nextIndex]
-    metricOrder[nextIndex] = swappedMetric
-    updateMobilePreferences({ metricOrder })
-  }
-
   const startDraggingWeatherMetric = (metric: WeatherMetricId, event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return
+    if (event.button !== 0 || !event.isPrimary) return
     event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
     setDraggedMetric(metric)
   }
 
@@ -947,12 +899,7 @@ function App() {
         setAndroidUpdate(update)
         setHasDownloadedAndroidUpdate(false)
         setAndroidUpdateStatus('')
-        if (update) {
-          setIsDownloadingAndroidUpdate(true)
-          await downloadAndroidUpdate(update)
-          if (disposed) return
-          setHasDownloadedAndroidUpdate(true)
-        }
+        setIsUpdatePromptOpen(Boolean(update && dismissedUpdateVersion.current !== update.version))
       } catch (error) {
         if (disposed) return
         setAndroidUpdateError(error instanceof Error ? error.message : 'Não foi possível verificar atualizações.')
@@ -985,10 +932,7 @@ function App() {
         setAndroidUpdate(update)
         setHasDownloadedAndroidUpdate(false)
         setAndroidUpdateStatus('')
-        if (update) {
-          setIsDownloadingAndroidUpdate(true)
-          return downloadAndroidUpdate(update).then(() => setHasDownloadedAndroidUpdate(true))
-        }
+        setIsUpdatePromptOpen(Boolean(update))
         return undefined
       })
       .catch((error: unknown) => {
@@ -1016,6 +960,7 @@ function App() {
         setAndroidUpdateStatus('Permita que o Hub Principal instale apps nesta tela de configurações. Depois, volte e toque em “Instalar atualização”.')
       } else {
         setAndroidUpdateStatus('Confirme a atualização na tela do Android.')
+        setIsUpdatePromptOpen(false)
       }
     } catch (error) {
       setAndroidUpdateError(error instanceof Error ? error.message : 'Não foi possível baixar ou iniciar a atualização.')
@@ -1133,12 +1078,41 @@ function App() {
     }
   }
 
+  const androidHeaderContent = (
+    <>
+      <div className="mobile-app-header">
+        {isTvMode && (
+          <button
+            className="mobile-tv-exit"
+            type="button"
+            onClick={() => void toggleAndroidTvMode(false)}
+            aria-label="Sair do modo TV"
+          >
+            <X size={16} />
+            <span>Sair do modo TV</span>
+          </button>
+        )}
+        <div className="mobile-header-center">
+          <div className="mobile-date"><CalendarDays size={14} /> {dateText}</div>
+          <LiveClock />
+          <span className={`mobile-connectivity${isOnline ? '' : ' is-offline'}`}>
+            <span className="live-dot" />
+            {isOnline ? 'Online' : 'Offline'}
+          </span>
+        </div>
+      </div>
+      <div className={`mobile-pull-status${tvModeError ? ' is-error' : ''}`} aria-live="polite">
+        {tvModeError ? <span role="alert">{tvModeError}</span> : isPullRefreshing ? 'Atualizando clima...' : 'Puxe para baixo para atualizar'}
+      </div>
+    </>
+  )
+
   return (
     <main
       className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ` android-app theme-${mobilePreferences.theme}` : ''}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}`}
       translate="no"
       onTouchStart={isAndroidApplication ? (event) => {
-        pullStartY.current = window.scrollY <= 2 ? event.touches[0]?.clientY ?? null : null
+        pullStartY.current = event.currentTarget.scrollTop <= 2 ? event.touches[0]?.clientY ?? null : null
       } : undefined}
       onTouchEnd={isAndroidApplication ? (event) => {
         const startY = pullStartY.current
@@ -1150,36 +1124,10 @@ function App() {
       } : undefined}
       onTouchCancel={() => { pullStartY.current = null }}
     >
-      <header className="hero-header">
-        {isAndroidApplication ? (
-          <>
-            <div className="mobile-app-header">
-              {isTvMode && (
-                <button
-                  className="mobile-tv-exit"
-                  type="button"
-                  onClick={() => void toggleAndroidTvMode(false)}
-                  aria-label="Sair do modo TV"
-                >
-                  <X size={16} />
-                  <span>Sair do modo TV</span>
-                </button>
-              )}
-              <div className="mobile-header-center">
-                <div className="mobile-date"><CalendarDays size={14} /> {dateText}</div>
-                <LiveClock />
-                <span className={`mobile-connectivity${isOnline ? '' : ' is-offline'}`}>
-                  <span className="live-dot" />
-                  {isOnline ? 'Online' : 'Offline'}
-                </span>
-              </div>
-            </div>
-            <div className={`mobile-pull-status${tvModeError ? ' is-error' : ''}`} aria-live="polite">
-              {tvModeError ? <span role="alert">{tvModeError}</span> : isPullRefreshing ? 'Atualizando clima...' : 'Puxe para baixo para atualizar'}
-            </div>
-          </>
-        ) : (
-          <>
+      {(!isAndroidApplication || isTvMode) && (
+        <header className="hero-header">
+          {isAndroidApplication ? androidHeaderContent : (
+            <>
         {!isAndroidApplication && (
           <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
             <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
@@ -1201,9 +1149,16 @@ function App() {
         <p className="auto-refresh-note">Atualização automática a cada 30 minutos</p>
         <InstallApp />
         {!isAndroidApplication && siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
-          </>
-        )}
-      </header>
+            </>
+          )}
+        </header>
+      )}
+      {isAndroidApplication && !isTvMode && createPortal(
+        <header className={`hero-header mobile-fixed-header theme-${mobilePreferences.theme}`}>
+          {androidHeaderContent}
+        </header>,
+        document.body,
+      )}
 
       {(!isAndroidApplication || activeMobileTab === 'home' || isTvMode) && <section className="content-grid">
         <section className="panel weather-panel">
@@ -1461,7 +1416,7 @@ function App() {
               <p>Marque os dados que quer exibir e segure a alça para arrastá-los na ordem desejada. A seleção também vale para o modo TV.</p>
             </div>
             <div className="preference-list">
-              {mobilePreferences.metricOrder.map((metric, index) => {
+              {mobilePreferences.metricOrder.map((metric) => {
                 const label = weatherMetricOptions.find((option) => option.id === metric)?.label || metric
                 return (
                   <div className={`preference-order-row${draggedMetric === metric ? ' is-dragging' : ''}`} data-metric-id={metric} key={metric}>
@@ -1481,10 +1436,6 @@ function App() {
                         onChange={() => toggleWeatherMetric(metric)}
                       />
                     </label>
-                    <div className="preference-order-actions">
-                      <HoldToMoveButton label={label} direction={-1} onMove={() => moveWeatherMetric(metric, -1)} disabled={index === 0} />
-                      <HoldToMoveButton label={label} direction={1} onMove={() => moveWeatherMetric(metric, 1)} disabled={index === mobilePreferences.metricOrder.length - 1} />
-                    </div>
                   </div>
                 )
               })}
@@ -1547,11 +1498,11 @@ function App() {
             </div>
             {androidUpdate && (
               <>
-                <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> O APK será baixado automaticamente.</p>
+                <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> Toque para baixar e iniciar a instalação.</p>
                 {androidUpdate.notes && <details className="app-update-notes"><summary>O que mudou</summary><p>{androidUpdate.notes}</p></details>}
                 <button className="app-update-button" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
                   <Download size={15} />
-                  {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar novamente'}
+                  {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Atualizar agora'}
                 </button>
               </>
             )}
@@ -1597,6 +1548,31 @@ function App() {
             </button>
           ))}
         </nav>
+      )}
+
+      {isAndroidApplication && androidUpdate && isUpdatePromptOpen && createPortal(
+        <div className={`update-prompt-backdrop theme-${mobilePreferences.theme}`} role="presentation">
+          <section className="update-prompt" role="dialog" aria-modal="true" aria-labelledby="update-prompt-title" aria-describedby="update-prompt-description">
+            <div className="update-prompt-icon"><Download size={30} /></div>
+            <span className="section-kicker">ATUALIZAÇÃO DISPONÍVEL</span>
+            <h2 id="update-prompt-title">Nova versão do Hub Principal</h2>
+            <p id="update-prompt-description">A versão <strong>{androidUpdate.version}</strong> está disponível para baixar e instalar.</p>
+            {androidUpdate.notes && <details className="update-prompt-notes"><summary>O que mudou nesta versão</summary><p>{androidUpdate.notes}</p></details>}
+            {androidUpdateStatus && <p className="update-prompt-status" role="status">{androidUpdateStatus}</p>}
+            {androidUpdateError && <p className="update-prompt-error" role="alert">{androidUpdateError}</p>}
+            <button className="update-prompt-install" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
+              <Download size={18} />
+              {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Atualizar agora'}
+            </button>
+            <button className="update-prompt-later" type="button" onClick={() => {
+              dismissedUpdateVersion.current = androidUpdate.version
+              setIsUpdatePromptOpen(false)
+            }} disabled={isDownloadingAndroidUpdate}>
+              Decidir depois
+            </button>
+          </section>
+        </div>,
+        document.body,
       )}
 
       {isCityModalOpen && (
