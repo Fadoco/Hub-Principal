@@ -40,7 +40,7 @@ Antes do primeiro build de release, configure uma única vez estes **Repository 
 
 Transfira a keystore para Base64 apenas com uma ferramenta local confiável e offline; não use sites de conversão, não inclua os valores em arquivos ou comandos versionados e não os imprima em logs. Informe os valores diretamente nos campos de secrets do GitHub. Os dados de senha e alias podem ser obtidos da configuração local ignorada `apk/release-signing.properties`. O workflow reconstrói a keystore apenas durante o job, remove os arquivos temporários ao terminar e falha claramente se qualquer secret estiver ausente. **Não gere outra chave:** sem acesso seguro à keystore original, não é possível publicar atualizações compatíveis com instalações existentes.
 
-Configure também **Settings → Pages → Build and deployment → Source → GitHub Actions** e, em **Settings → Actions → General → Workflow permissions**, permita acesso de escrita ao conteúdo do repositório para o `GITHUB_TOKEN` (o workflow declara `contents: write`, além de `pages: write` e `id-token: write`). Se houver proteção na branch `main`, permita que o `GITHUB_TOKEN` salve o APK e o manifesto de referência. Para manter as manchetes no site publicado, cadastre `VITE_NEWS_API_URL` como uma Actions variable do repositório. Depois desses ajustes únicos, envie as alterações para `main`; para um novo release, incremente `versionCode` e `versionName` em `apk/app/build.gradle`.
+Configure também **Settings → Pages → Build and deployment → Source → GitHub Actions** e, em **Settings → Actions → General → Workflow permissions**, permita acesso de escrita ao conteúdo do repositório para o `GITHUB_TOKEN` (o workflow declara `contents: write`, além de `pages: write` e `id-token: write`). Se houver proteção na branch `main`, permita que o `GITHUB_TOKEN` salve o APK e o manifesto de referência. O app usa o endpoint público padrão para exibir as manchetes; configure `VITE_NEWS_API_URL` como Actions variable somente se quiser substituí-lo. Depois desses ajustes únicos, envie as alterações para `main`; para um novo release, incremente `versionCode` e `versionName` em `apk/app/build.gradle`.
 
 Como alternativa, envie pela interface web do GitHub um APK assinado para `updates/Hub-Principal.apk` e faça commit na branch `main`. O mesmo workflow valida pacote, assinatura, versão e SHA-256 contra o APK atualmente publicado, rejeita uma chave incompatível e atualiza o manifesto. O `versionCode` e a versão X.Y.Z precisam ser superiores aos publicados. O manifesto e o APK são publicados pelo GitHub Pages em `https://fadoco.github.io/Hub-Principal/updates/`; não é necessário editar ou enviar `docs/updates/` manualmente.
 
@@ -71,7 +71,7 @@ O frontend do GitHub Pages não consegue ler feeds de notícias diretamente por 
 
    O Wrangler exibirá o endereço `workers.dev` da API. O endpoint de notícias termina em `/news`.
 
-3. Configure esse endereço como `VITE_NEWS_API_URL` em `.env.local` (arquivo local, não versionado):
+3. Opcionalmente, configure outro endereço compatível como `VITE_NEWS_API_URL` em `.env.local` (arquivo local, não versionado):
 
    ```text
    VITE_NEWS_API_URL=https://SEU-WORKER.workers.dev/news
@@ -83,11 +83,11 @@ O frontend do GitHub Pages não consegue ler feeds de notícias diretamente por 
    npm run build:pages
    ```
 
-Sem essa configuração, o Hub continua oferecendo links que abrem as buscas diretamente no Google Notícias, mas não exibe manchetes dentro dos cartões. Para um domínio próprio, adicione a origem do site em `ALLOWED_ORIGINS` no [worker/wrangler.toml](./worker/wrangler.toml) e publique o Worker novamente.
+O app já usa por padrão a API pública do projeto para exibir manchetes; essa configuração só é necessária para substituir o endpoint. Para um domínio próprio, adicione a origem do site em `ALLOWED_ORIGINS` no [worker/wrangler.toml](./worker/wrangler.toml) e publique o Worker novamente.
 
 ## Publicação no GitHub Pages
 
-O workflow do GitHub Actions gera o build em `docs/` e publica essa pasta no GitHub Pages automaticamente. `VITE_NEWS_API_URL`, quando configurada como Actions variable, também é usada no APK Android.
+O workflow do GitHub Actions gera o build em `docs/` e publica essa pasta no GitHub Pages automaticamente. `VITE_NEWS_API_URL`, quando configurada como Actions variable, substitui o endpoint padrão e também é usada no APK Android.
 
 O endereço atual do projeto é:
 

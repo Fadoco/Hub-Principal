@@ -10,6 +10,7 @@ const NEWS_FUTURE_TOLERANCE_MS = 60 * 60 * 1000
 const NEWS_ITEMS_LIMIT = 7
 const NEWS_NEW_BADGE_AGE_MS = 24 * 60 * 60 * 1000
 const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL?.trim()
+  || 'https://hub-principal-news-api.hub-principal-fadoco.workers.dev/news'
 
 function normalizeNewsItems(items: NewsItem[]) {
   const latestAllowedTime = Date.now() - NEWS_MAX_AGE_MS

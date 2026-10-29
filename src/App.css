@@ -26,6 +26,15 @@ button, input { font: inherit; }
 button { color: inherit; }
 #root { min-height: 100vh; }
 body.tv-mode-active { overflow: hidden; }
+html.android-app-active,
+html.android-app-active body,
+html.android-app-active body * { scrollbar-width: none; -ms-overflow-style: none; }
+html.android-app-active,
+html.android-app-active body,
+html.android-app-active #root { height: 100%; overflow: hidden; }
+html.android-app-active::-webkit-scrollbar,
+html.android-app-active body::-webkit-scrollbar,
+html.android-app-active body *::-webkit-scrollbar { display: none; height: 0; width: 0; }
 
 .app-shell { margin: 0 auto; max-width: 1240px; padding: 0 28px 36px; }
 .hero-header {
@@ -462,20 +471,27 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .location-modal { padding: 16px; }
 }
 .android-app {
+  height: 100dvh;
   margin: 0 auto;
   max-width: 560px;
-  min-height: 100dvh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   padding: 0 16px calc(92px + env(safe-area-inset-bottom));
 }
 .android-app .hero-header {
   backdrop-filter: blur(18px);
   background: rgba(11, 18, 32, .94);
   border-bottom: 1px solid rgba(190, 208, 231, .12);
+  height: calc(142px + env(safe-area-inset-top));
+  left: auto;
   margin: 0 -16px;
   padding: max(16px, env(safe-area-inset-top)) 18px 12px;
   position: sticky;
   text-align: left;
   top: 0;
+  width: auto;
   z-index: 20;
 }
 .mobile-app-header { align-items: center; display: flex; justify-content: center; min-height: 94px; position: relative; }
@@ -583,35 +599,74 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 .preference-toggle-row { align-items: center; color: var(--ink); display: flex; font-size: 12px; gap: 12px; justify-content: space-between; min-height: 44px; }
 .preference-toggle-row input, .preference-size-options input { accent-color: var(--teal); height: 18px; width: 18px; }
 .preference-list { border-top: 1px solid var(--line); }
-.preference-order-row { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
+.preference-order-row { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: 7px; }
 .preference-order-row:last-child { border-bottom: 0; }
 .preference-order-row .preference-toggle-row { flex: 1; }
 .preference-order-actions { display: flex; gap: 5px; }
-.preference-order-actions button { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; color: var(--teal-dark); cursor: pointer; display: inline-flex; height: 34px; justify-content: center; width: 34px; }
+.preference-drag-handle { align-items: center; background: transparent; border: 0; color: var(--muted); cursor: grab; display: inline-flex; flex: 0 0 24px; height: 38px; justify-content: center; padding: 0; touch-action: none; }
+.preference-drag-handle:active { color: var(--teal); cursor: grabbing; }
+.preference-order-row.is-dragging { background: rgba(112, 226, 219, .1); }
+.preference-order-row.is-dragging .preference-drag-handle { color: var(--teal); cursor: grabbing; }
+.preference-order-actions button { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; color: var(--teal-dark); cursor: pointer; display: inline-flex; height: 34px; justify-content: center; touch-action: none; user-select: none; -webkit-user-select: none; width: 34px; }
 .preference-order-actions button:disabled { cursor: default; opacity: .4; }
-.preference-size-options { border: 0; display: flex; gap: 18px; margin: 0; padding: 0 0 10px; }
-.preference-size-options legend { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
-.preference-size-options label { align-items: center; color: var(--ink); display: inline-flex; font-size: 11px; gap: 7px; }
-.preference-size-options input { height: 16px; width: 16px; }
+.preference-size-options, .preference-theme-options { border: 0; display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 0; padding: 0 0 12px; }
+.preference-size-options legend, .preference-theme-options legend { color: var(--muted); font-size: 11px; margin-bottom: 8px; width: 100%; }
+.preference-size-options label, .preference-theme-options label { align-items: center; color: var(--ink); display: inline-flex; font-size: 11px; gap: 7px; }
+.preference-size-options input, .preference-theme-options input { accent-color: var(--teal); height: 16px; width: 16px; }
+.preference-reset-description { border-top: 1px solid var(--line); margin-top: 2px; padding-top: 12px; }
+.preference-reset-button { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 10px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 700; gap: 8px; justify-content: center; margin-top: 10px; min-height: 42px; padding: 0 14px; }
+.preference-reset-button:active { transform: scale(.98); }
 .preference-storage-error, .preferences-empty-state { background: rgba(255, 143, 143, .1); border: 1px solid rgba(255, 143, 143, .25); border-radius: 12px; color: #ffd0d2; font-size: 11px; line-height: 1.5; padding: 12px; }
 .preferences-empty-state { grid-column: 1 / -1; }
-.android-app.high-contrast {
+.android-app.theme-dark {
+  color-scheme: dark;
   --page: #000;
-  --surface: #050505;
-  --surface-raised: #111;
-  --surface-soft: #080808;
+  --surface: #090909;
+  --surface-raised: #171717;
+  --surface-soft: #101010;
   --ink: #fff;
-  --muted: #fff;
-  --line: rgba(255, 255, 255, .62);
-  --teal: #80fff5;
-  --teal-dark: #a4fff8;
+  --muted: #d3d8df;
+  --line: rgba(255, 255, 255, .22);
+  --teal: #70e2db;
+  --teal-dark: #a8f0e9;
+  background: #000;
 }
-.android-app.high-contrast .panel,
-.android-app.high-contrast .news-panel,
-.android-app.high-contrast .useful-sites,
-.android-app.high-contrast .mobile-preferences-card,
-.android-app.high-contrast .mobile-about-card,
-.android-app.high-contrast .app-update-panel { background: #050505; border-color: rgba(255, 255, 255, .62); }
+.android-app.theme-dark .panel,
+.android-app.theme-dark .news-panel,
+.android-app.theme-dark .useful-sites,
+.android-app.theme-dark .mobile-preferences-card,
+.android-app.theme-dark .mobile-about-card,
+.android-app.theme-dark .app-update-panel { background: #090909; border-color: rgba(255, 255, 255, .24); }
+.android-app.theme-light {
+  color-scheme: light;
+  --page: #f2f5f8;
+  --surface: #fff;
+  --surface-raised: #e8edf2;
+  --surface-soft: #f6f8fa;
+  --ink: #172033;
+  --muted: #4a5668;
+  --line: rgba(33, 48, 69, .2);
+  --teal: #087f82;
+  --teal-dark: #075e63;
+  background: var(--page);
+}
+.android-app.theme-light .hero-header { background: rgba(242, 245, 248, .96); border-bottom-color: var(--line); }
+.android-app.theme-light .panel,
+.android-app.theme-light .news-panel,
+.android-app.theme-light .useful-sites,
+.android-app.theme-light .radar-links-panel,
+.android-app.theme-light .mobile-preferences-card,
+.android-app.theme-light .mobile-about-card,
+.android-app.theme-light .app-update-panel { background: #fff; border-color: var(--line); }
+.android-app.theme-light .mobile-bottom-nav { background: rgba(255, 255, 255, .97); border-top-color: var(--line); }
+.android-app.theme-light .current-weather { background: #f1f7f7; border-color: rgba(8, 127, 130, .2); }
+.android-app.theme-light .hour-item,
+.android-app.theme-light .currency-row { background: #f6f8fa; border-color: var(--line); }
+.android-app.theme-light .mobile-tv-toggle { background: #f4f8f8; border-color: rgba(8, 127, 130, .25); }
+.android-app.theme-light .mobile-auto-update { background: #e9f8ef; border-color: #b7e5c7; color: #17653a; }
+.android-app.theme-light .news-error,
+.android-app.theme-light .preference-storage-error,
+.android-app.theme-light .preferences-empty-state { color: #8c2525; }
 .android-app.text-size-large .mobile-date,
 .android-app.text-size-large .mobile-view-heading p,
 .android-app.text-size-large .mobile-view-heading h2,
@@ -634,6 +689,7 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 .android-app.text-size-large .preference-toggle-row,
 .android-app.text-size-large .preference-order-actions button,
 .android-app.text-size-large .preference-size-options label,
+.android-app.text-size-large .preference-theme-options label,
 .android-app.text-size-large .mobile-tv-toggle strong,
 .android-app.text-size-large .mobile-tv-toggle small,
 .android-app.text-size-large .mobile-about-card > p,
@@ -680,7 +736,8 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   }
   .android-app.tv-mode .hero-header {
     background: transparent; border-bottom: 1px solid var(--line); grid-column: 1 / -1;
-    grid-row: 1; margin: 0; min-height: 0; padding: 0 6px; position: relative;
+    grid-row: 1; height: auto; left: auto; margin: 0; min-height: 0; padding: 0 6px;
+    position: relative; transform: none; width: auto;
   }
   .android-app.tv-mode .mobile-app-header { min-height: 0; padding-top: 0; }
   .android-app.tv-mode .mobile-header-center { gap: 0; }

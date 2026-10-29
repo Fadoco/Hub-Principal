@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Activity, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronUp, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, Settings2, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from 'react'
+import { Activity, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronUp, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, GripVertical, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, RotateCcw, Settings2, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
 import './App.css'
 import CurrencyPanel from './CurrencyPanel'
 import NewsPanel from './NewsPanel'
@@ -31,13 +31,14 @@ type WeatherData = { current: Record<string, number | string>; hourly: { time: s
 type PersonalSite = { name: string; url: string }
 type WeatherMetricId = 'humidity' | 'wind' | 'pressure' | 'precipitation' | 'visibility' | 'sunrise' | 'sunset' | 'uv' | 'clouds'
 type NewsCategoryId = 'local' | 'games' | 'films' | 'anime' | 'geek' | 'global'
+type MobileTheme = 'original' | 'dark' | 'light'
 type MobilePreferences = {
   rainAlerts: boolean
   visibleMetrics: WeatherMetricId[]
   metricOrder: WeatherMetricId[]
   newsCategories: NewsCategoryId[]
   textSize: 'normal' | 'large'
-  highContrast: boolean
+  theme: MobileTheme
 }
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const WEATHER_CACHE_TTL = 180000
@@ -70,7 +71,7 @@ const defaultMobilePreferences: MobilePreferences = {
   metricOrder: defaultMetricOrder,
   newsCategories: newsCategoryOptions.map(({ id }) => id),
   textSize: 'normal',
-  highContrast: false,
+  theme: 'original',
 }
 const radarSources = [
   { label: 'Satélite meteorológico', description: 'Imagens e animação de satélite', url: 'https://www.ipmetradar.com.br/2satelite.php' },
@@ -128,7 +129,7 @@ const readMobilePreferences = () => {
     if (!saved) return { value: defaultMobilePreferences, error: '' }
     const parsed: unknown = JSON.parse(saved)
     if (!parsed || typeof parsed !== 'object') throw new Error('invalid-mobile-preferences')
-    const value = parsed as Partial<MobilePreferences>
+    const value = parsed as Partial<MobilePreferences> & { highContrast?: boolean }
     const validMetrics = (items: unknown): items is WeatherMetricId[] =>
       Array.isArray(items) && items.every((id) => defaultMetricOrder.includes(id))
     const validCategories = (items: unknown): items is NewsCategoryId[] =>
@@ -149,7 +150,9 @@ const readMobilePreferences = () => {
         metricOrder,
         newsCategories,
         textSize: value.textSize === 'large' ? 'large' : 'normal',
-        highContrast: typeof value.highContrast === 'boolean' ? value.highContrast : false,
+        theme: value.theme === 'dark' || value.theme === 'light'
+          ? value.theme
+          : value.highContrast === true ? 'dark' : 'original',
       },
       error: '',
     }
@@ -272,6 +275,62 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
 
 function Metric({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: string; detail?: string; tone?: string }) {
   return <div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>
+}
+
+function HoldToMoveButton({ label, direction, disabled, onMove }: { label: string; direction: -1 | 1; disabled: boolean; onMove: () => void }) {
+  const delayTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pointerActivated = useRef(false)
+  const onMoveRef = useRef(onMove)
+
+  useEffect(() => {
+    onMoveRef.current = onMove
+  }, [onMove])
+
+  const stopRepeating = () => {
+    if (delayTimer.current) window.clearTimeout(delayTimer.current)
+    if (repeatTimer.current) window.clearInterval(repeatTimer.current)
+    delayTimer.current = null
+    repeatTimer.current = null
+  }
+
+  useEffect(() => stopRepeating, [])
+
+  const startRepeating = (event: PointerEvent<HTMLButtonElement>) => {
+    if (disabled || event.button !== 0) return
+    pointerActivated.current = true
+    event.currentTarget.setPointerCapture(event.pointerId)
+    onMoveRef.current()
+    delayTimer.current = window.setTimeout(() => {
+      repeatTimer.current = window.setInterval(() => onMoveRef.current(), 100)
+    }, 350)
+  }
+
+  const activateFromKeyboard = () => {
+    if (pointerActivated.current) {
+      pointerActivated.current = false
+      return
+    }
+    onMove()
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={`Mover ${label} ${direction < 0 ? 'para cima' : 'para baixo'}`}
+      disabled={disabled}
+      onPointerDown={startRepeating}
+      onPointerUp={stopRepeating}
+      onPointerCancel={() => {
+        stopRepeating()
+        pointerActivated.current = false
+      }}
+      onLostPointerCapture={stopRepeating}
+      onClick={activateFromKeyboard}
+    >
+      {direction < 0 ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+    </button>
+  )
 }
 
 function UsefulSites() {
@@ -506,6 +565,8 @@ function App() {
   const [siteResetError, setSiteResetError] = useState('')
   const [favoriteLocations, setFavoriteLocations] = useState<FavoriteLocationsState>(readFavoriteLocations)
   const [mobilePreferenceState, setMobilePreferenceState] = useState(readMobilePreferences)
+  const [draggedMetric, setDraggedMetric] = useState<WeatherMetricId | null>(null)
+  const mobilePreferencesRef = useRef(mobilePreferenceState.value)
   const [isCityModalOpen, setIsCityModalOpen] = useState(false)
   const [isPersonalizationOpen, setIsPersonalizationOpen] = useState(false)
   const [isTvMode, setIsTvMode] = useState(false)
@@ -548,6 +609,11 @@ function App() {
     return () => document.body.classList.remove('tv-mode-active')
   }, [isTvMode])
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('android-app-active', isAndroidApplication)
+    return () => document.documentElement.classList.remove('android-app-active')
+  }, [isAndroidApplication])
+
   const resetSiteData = async () => {
     if (!window.confirm('Isso apagará os dados salvos, incluindo cidades favoritas, e atualizará o site. Deseja continuar?')) return
 
@@ -586,13 +652,73 @@ function App() {
     }
   }
 
-  const updateMobilePreferences = (update: Partial<MobilePreferences>) => {
-    const next = { ...mobilePreferences, ...update }
+  const updateMobilePreferences = useCallback((update: Partial<MobilePreferences>) => {
+    const next = { ...mobilePreferencesRef.current, ...update }
     try {
       localStorage.setItem(MOBILE_PREFERENCES_KEY, JSON.stringify(next))
+      mobilePreferencesRef.current = next
       setMobilePreferenceState({ value: next, error: '' })
     } catch {
       setMobilePreferenceState((current) => ({ ...current, error: 'Não foi possível salvar as preferências neste aplicativo.' }))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!draggedMetric) return
+
+    const appShell = document.querySelector<HTMLElement>('.android-app')
+    let pointerY: number | null = null
+    const reorderAt = (clientY: number) => {
+      const rows = Array.from(document.querySelectorAll<HTMLElement>('.preference-order-row[data-metric-id]'))
+      const otherMetrics = mobilePreferences.metricOrder.filter((metric) => metric !== draggedMetric)
+      const insertionIndex = otherMetrics.findIndex((metric) => {
+        const row = rows.find((item) => item.dataset.metricId === metric)
+        return row ? clientY < row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2 : false
+      })
+      const nextOrder = [...otherMetrics]
+      nextOrder.splice(insertionIndex < 0 ? nextOrder.length : insertionIndex, 0, draggedMetric)
+      if (nextOrder.some((metric, index) => metric !== mobilePreferences.metricOrder[index])) {
+        updateMobilePreferences({ metricOrder: nextOrder })
+      }
+    }
+
+    const finishDragging = () => setDraggedMetric(null)
+    const onPointerMove = (event: globalThis.PointerEvent) => {
+      pointerY = event.clientY
+      reorderAt(pointerY)
+    }
+    const autoScrollTimer = window.setInterval(() => {
+      if (!appShell || pointerY === null || appShell.scrollHeight <= appShell.clientHeight) return
+      const bounds = appShell.getBoundingClientRect()
+      if (pointerY < bounds.top + 70) appShell.scrollTop -= 14
+      else if (pointerY > bounds.bottom - 90) appShell.scrollTop += 14
+      else return
+      reorderAt(pointerY)
+    }, 50)
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', finishDragging)
+    window.addEventListener('pointercancel', finishDragging)
+    return () => {
+      window.clearInterval(autoScrollTimer)
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', finishDragging)
+      window.removeEventListener('pointercancel', finishDragging)
+    }
+  }, [draggedMetric, mobilePreferences.metricOrder, updateMobilePreferences])
+  const resetMobilePreferences = () => {
+    const defaults: MobilePreferences = {
+      ...defaultMobilePreferences,
+      visibleMetrics: [...defaultMobilePreferences.visibleMetrics],
+      metricOrder: [...defaultMobilePreferences.metricOrder],
+      newsCategories: [...defaultMobilePreferences.newsCategories],
+    }
+    try {
+      localStorage.setItem(MOBILE_PREFERENCES_KEY, JSON.stringify(defaults))
+      mobilePreferencesRef.current = defaults
+      setMobilePreferenceState({ value: defaults, error: '' })
+    } catch {
+      setMobilePreferenceState((current) => ({ ...current, error: 'Não foi possível restaurar as personalizações neste aplicativo.' }))
     }
   }
 
@@ -612,6 +738,12 @@ function App() {
     metricOrder[index] = metricOrder[nextIndex]
     metricOrder[nextIndex] = swappedMetric
     updateMobilePreferences({ metricOrder })
+  }
+
+  const startDraggingWeatherMetric = (metric: WeatherMetricId, event: PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    setDraggedMetric(metric)
   }
 
   const toggleNewsCategory = (category: NewsCategoryId) => {
@@ -1003,7 +1135,7 @@ function App() {
 
   return (
     <main
-      className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ' android-app' : ''}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}${isAndroidApplication && mobilePreferences.highContrast ? ' high-contrast' : ''}`}
+      className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ` android-app theme-${mobilePreferences.theme}` : ''}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}`}
       translate="no"
       onTouchStart={isAndroidApplication ? (event) => {
         pullStartY.current = window.scrollY <= 2 ? event.touches[0]?.clientY ?? null : null
@@ -1326,13 +1458,21 @@ function App() {
             <div className="preferences-card-heading">
               <span className="section-kicker">TELA INICIAL E MODO TV</span>
               <h3>Cartões do clima</h3>
-              <p>Escolha os dados exibidos e ajuste a ordem. A seleção também vale para o modo TV.</p>
+              <p>Marque os dados que quer exibir e segure a alça para arrastá-los na ordem desejada. A seleção também vale para o modo TV.</p>
             </div>
             <div className="preference-list">
               {mobilePreferences.metricOrder.map((metric, index) => {
                 const label = weatherMetricOptions.find((option) => option.id === metric)?.label || metric
                 return (
-                  <div className="preference-order-row" key={metric}>
+                  <div className={`preference-order-row${draggedMetric === metric ? ' is-dragging' : ''}`} data-metric-id={metric} key={metric}>
+                    <button
+                      className="preference-drag-handle"
+                      type="button"
+                      aria-label={`Segure e arraste ${label} para reorganizar`}
+                      onPointerDown={(event) => startDraggingWeatherMetric(metric, event)}
+                    >
+                      <GripVertical size={17} />
+                    </button>
                     <label className="preference-toggle-row">
                       <span>{label}</span>
                       <input
@@ -1342,8 +1482,8 @@ function App() {
                       />
                     </label>
                     <div className="preference-order-actions">
-                      <button type="button" aria-label={`Mover ${label} para cima`} onClick={() => moveWeatherMetric(metric, -1)} disabled={index === 0}><ChevronUp size={17} /></button>
-                      <button type="button" aria-label={`Mover ${label} para baixo`} onClick={() => moveWeatherMetric(metric, 1)} disabled={index === mobilePreferences.metricOrder.length - 1}><ChevronDown size={17} /></button>
+                      <HoldToMoveButton label={label} direction={-1} onMove={() => moveWeatherMetric(metric, -1)} disabled={index === 0} />
+                      <HoldToMoveButton label={label} direction={1} onMove={() => moveWeatherMetric(metric, 1)} disabled={index === mobilePreferences.metricOrder.length - 1} />
                     </div>
                   </div>
                 )
@@ -1371,23 +1511,26 @@ function App() {
           </section>}
           {isPersonalizationOpen && <section className="mobile-preferences-card">
             <div className="preferences-card-heading">
-              <span className="section-kicker">ACESSIBILIDADE</span>
-              <h3>Leitura e contraste</h3>
-              <p>Ajustes visuais salvos somente neste aplicativo.</p>
+              <span className="section-kicker">APARÊNCIA</span>
+              <h3>Tema do aplicativo</h3>
+              <p>Escolha o visual usado em todas as telas.</p>
             </div>
             <fieldset className="preference-size-options">
               <legend>Tamanho do texto</legend>
               <label><input type="radio" name="mobile-text-size" checked={mobilePreferences.textSize === 'normal'} onChange={() => updateMobilePreferences({ textSize: 'normal' })} /> Padrão</label>
               <label><input type="radio" name="mobile-text-size" checked={mobilePreferences.textSize === 'large'} onChange={() => updateMobilePreferences({ textSize: 'large' })} /> Maior</label>
             </fieldset>
-            <label className="preference-toggle-row">
-              <span>Alto contraste</span>
-              <input
-                type="checkbox"
-                checked={mobilePreferences.highContrast}
-                onChange={(event) => updateMobilePreferences({ highContrast: event.target.checked })}
-              />
-            </label>
+            <fieldset className="preference-theme-options">
+              <legend>Modo de cor</legend>
+              <label><input type="radio" name="mobile-theme" checked={mobilePreferences.theme === 'original'} onChange={() => updateMobilePreferences({ theme: 'original' })} /> Original do app</label>
+              <label><input type="radio" name="mobile-theme" checked={mobilePreferences.theme === 'dark'} onChange={() => updateMobilePreferences({ theme: 'dark' })} /> Escuro</label>
+              <label><input type="radio" name="mobile-theme" checked={mobilePreferences.theme === 'light'} onChange={() => updateMobilePreferences({ theme: 'light' })} /> Claro</label>
+            </fieldset>
+            <p className="preference-reset-description">Restaura o tema original, o tamanho do texto e as opções padrão de cartões, notícias e alertas. Seus sites e cidades favoritas serão mantidos.</p>
+            <button className="preference-reset-button" type="button" onClick={resetMobilePreferences}>
+              <RotateCcw size={16} />
+              Restaurar personalizações
+            </button>
           </section>}
           {isPersonalizationOpen && mobilePreferenceState.error && <p className="preference-storage-error" role="alert">{mobilePreferenceState.error}</p>}
           {!isPersonalizationOpen && <PersonalSites />}
