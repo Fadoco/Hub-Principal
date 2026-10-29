@@ -14,12 +14,14 @@ export type AndroidUpdate = {
 }
 
 const androidUpdatePlugin = registerPlugin<AndroidUpdatePlugin>('AppUpdate')
-const releaseUrl = 'https://api.github.com/repos/Fadoco/Hub-Principal/releases/latest'
+const updateManifestUrl = 'https://fadoco.github.io/Hub-Principal/updates/version.json'
 
-type GitHubRelease = {
-  tag_name?: unknown
-  body?: unknown
-  assets?: unknown
+type UpdateManifest = {
+  version?: unknown
+  versionCode?: unknown
+  url?: unknown
+  sha256?: unknown
+  notes?: unknown
 }
 
 const parseVersion = (value: string) => {
@@ -42,41 +44,36 @@ export const isAndroidApp = () => Capacitor.getPlatform() === 'android'
 
 export const checkForAndroidUpdate = async (): Promise<AndroidUpdate | null> => {
   const { versionName } = await androidUpdatePlugin.getAppVersion()
-  const response = await fetch(releaseUrl, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
+  const response = await fetch(`${updateManifestUrl}?t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
   })
 
   if (response.status === 404) return null
-  if (!response.ok) throw new Error(`O GitHub respondeu com erro ${response.status} ao consultar atualizações.`)
+  if (!response.ok) throw new Error(`O servidor de atualizações respondeu com erro ${response.status}.`)
 
-  const release: GitHubRelease = await response.json() as GitHubRelease
-  if (typeof release.tag_name !== 'string' || !Array.isArray(release.assets)) {
-    throw new Error('A publicação mais recente no GitHub não contém informações válidas.')
+  const manifest: UpdateManifest = await response.json() as UpdateManifest
+  if (typeof manifest.version !== 'string' || typeof manifest.versionCode !== 'number' ||
+      !Number.isSafeInteger(manifest.versionCode) || manifest.versionCode < 1 ||
+      typeof manifest.url !== 'string' || typeof manifest.sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/i.test(manifest.sha256)) {
+    throw new Error('O manifesto de atualização não contém informações válidas.')
   }
 
-  if (!isNewerVersion(release.tag_name, versionName)) return null
+  if (!isNewerVersion(manifest.version, versionName)) return null
 
-  const apk = release.assets.find((asset): asset is { name: string; browser_download_url: string; digest: string } => {
-    if (!asset || typeof asset !== 'object') return false
-    const candidate = asset as Record<string, unknown>
-    return candidate.name === 'Hub-Principal.apk' &&
-      typeof candidate.browser_download_url === 'string' &&
-      typeof candidate.digest === 'string' &&
-      /^sha256:[a-f0-9]{64}$/i.test(candidate.digest)
-  })
-
-  if (!apk || !/^https:\/\/github\.com\/Fadoco\/Hub-Principal\/releases\/download\//i.test(apk.browser_download_url)) {
-    throw new Error('A publicação mais recente não possui um APK válido com verificação SHA-256.')
+  const apkUrl = new URL(manifest.url)
+  if (apkUrl.origin !== 'https://fadoco.github.io' ||
+      apkUrl.pathname !== '/Hub-Principal/updates/Hub-Principal.apk' ||
+      apkUrl.searchParams.get('v') !== String(manifest.versionCode)) {
+    throw new Error('O link do APK no manifesto não é válido.')
   }
 
   return {
-    version: release.tag_name.replace(/^v/i, ''),
-    url: apk.browser_download_url,
-    sha256: apk.digest.slice('sha256:'.length),
-    notes: typeof release.body === 'string' ? release.body : '',
+    version: manifest.version,
+    url: apkUrl.toString(),
+    sha256: manifest.sha256,
+    notes: typeof manifest.notes === 'string' ? manifest.notes : '',
   }
 }
 

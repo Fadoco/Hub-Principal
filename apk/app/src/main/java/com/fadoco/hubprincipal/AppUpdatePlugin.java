@@ -26,7 +26,8 @@ import java.util.Locale;
 public class AppUpdatePlugin extends Plugin {
     private static final long MAX_APK_BYTES = 100L * 1024L * 1024L;
     private static final String APK_NAME = "Hub-Principal.apk";
-    private static final String RELEASE_PATH = "/Fadoco/Hub-Principal/releases/download/";
+    private static final String APK_HOST = "fadoco.github.io";
+    private static final String APK_PATH = "/Hub-Principal/updates/Hub-Principal.apk";
 
     @PluginMethod
     public void getAppVersion(PluginCall call) {
@@ -108,9 +109,11 @@ public class AppUpdatePlugin extends Plugin {
 
             connection = (HttpURLConnection) new URL(downloadUrl).openConnection();
             connection.setRequestMethod("GET");
+            connection.setUseCaches(false);
             connection.setConnectTimeout(15000);
             connection.setReadTimeout(30000);
             connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("Cache-Control", "no-cache");
             connection.setRequestProperty("Accept", "application/vnd.android.package-archive");
             connection.setRequestProperty("User-Agent", "HubPrincipal-Android-Updater");
 
@@ -165,12 +168,13 @@ public class AppUpdatePlugin extends Plugin {
     }
 
     private boolean isValidReleaseUrl(String value) {
-        if (value == null || !value.startsWith("https://github.com/")) return false;
+        if (value == null || !value.startsWith("https://fadoco.github.io/")) return false;
         try {
             URL url = new URL(value);
-            return "github.com".equalsIgnoreCase(url.getHost()) &&
-                url.getPath().startsWith(RELEASE_PATH) &&
-                url.getPath().endsWith("/" + APK_NAME);
+            return APK_HOST.equalsIgnoreCase(url.getHost()) &&
+                APK_PATH.equals(url.getPath()) &&
+                url.getQuery() != null &&
+                url.getQuery().matches("v=[1-9][0-9]*");
         } catch (Exception exception) {
             return false;
         }
@@ -178,10 +182,7 @@ public class AppUpdatePlugin extends Plugin {
 
     private boolean isAllowedDownloadHost(String host) {
         String normalizedHost = host.toLowerCase(Locale.ROOT);
-        return "github.com".equals(normalizedHost) ||
-            "release-assets.githubusercontent.com".equals(normalizedHost) ||
-            "objects.githubusercontent.com".equals(normalizedHost) ||
-            "github-releases.githubusercontent.com".equals(normalizedHost);
+        return APK_HOST.equals(normalizedHost);
     }
 
     private String toHex(byte[] bytes) {
