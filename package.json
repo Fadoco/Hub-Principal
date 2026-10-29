@@ -9,7 +9,6 @@
     "build:pages": "tsc -b && vite build --base=/Hub-Principal/ --outDir docs",
     "build:android": "npm run build && npx cap sync android && cd apk && gradlew.bat assembleDebug && cd .. && node -e \"require('node:fs').copyFileSync(require('node:path').join('apk','app','build','outputs','apk','debug','app-debug.apk'),require('node:path').join('apk','Hub-Principal-debug.apk'))\"",
     "build:android:release": "npm run build && npx cap sync android && cd apk && gradlew.bat assembleRelease",
-    "prepare:android-update": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-android-update.ps1",
     "sync:android": "npm run build && npx cap sync android",
     "open:android": "npx cap open android",
     "lint": "oxlint",

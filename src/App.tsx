@@ -8,6 +8,7 @@ import SatellitePanel from './SatellitePanel'
 import {
   checkForAndroidUpdate,
   downloadAndroidUpdate,
+  getInstalledAndroidAppVersion,
   installDownloadedAndroidUpdate,
   isAndroidApp,
   type AndroidUpdate,
@@ -253,6 +254,7 @@ function App() {
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [selectedCitySuggestion, setSelectedCitySuggestion] = useState<CitySuggestion | null>(null)
   const [androidUpdate, setAndroidUpdate] = useState<AndroidUpdate | null>(null)
+  const [installedAndroidAppVersion, setInstalledAndroidAppVersion] = useState('')
   const [androidUpdateError, setAndroidUpdateError] = useState('')
   const [androidUpdateStatus, setAndroidUpdateStatus] = useState('')
   const [isCheckingAndroidUpdate, setIsCheckingAndroidUpdate] = useState(isAndroidApp())
@@ -470,6 +472,23 @@ function App() {
   useEffect(() => {
     if (!isAndroidApp()) return
 
+    let disposed = false
+    void getInstalledAndroidAppVersion()
+      .then((version) => {
+        if (!disposed) setInstalledAndroidAppVersion(version)
+      })
+      .catch(() => {
+        if (!disposed) setInstalledAndroidAppVersion('indisponível')
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isAndroidApp()) return
+
     let lastCheck = 0
     let disposed = false
     const checkForUpdate = async (force = false) => {
@@ -482,12 +501,21 @@ function App() {
         setAndroidUpdateError('')
         setAndroidUpdate(update)
         setHasDownloadedAndroidUpdate(false)
-        setAndroidUpdateStatus(update ? '' : 'O aplicativo está atualizado.')
+        setAndroidUpdateStatus('')
+        if (update) {
+          setIsDownloadingAndroidUpdate(true)
+          await downloadAndroidUpdate(update)
+          if (disposed) return
+          setHasDownloadedAndroidUpdate(true)
+        }
       } catch (error) {
         if (disposed) return
         setAndroidUpdateError(error instanceof Error ? error.message : 'Não foi possível verificar atualizações.')
       } finally {
-        if (!disposed) setIsCheckingAndroidUpdate(false)
+        if (!disposed) {
+          setIsCheckingAndroidUpdate(false)
+          setIsDownloadingAndroidUpdate(false)
+        }
       }
     }
 
@@ -511,12 +539,20 @@ function App() {
       .then((update) => {
         setAndroidUpdate(update)
         setHasDownloadedAndroidUpdate(false)
-        setAndroidUpdateStatus(update ? '' : 'O aplicativo está atualizado.')
+        setAndroidUpdateStatus('')
+        if (update) {
+          setIsDownloadingAndroidUpdate(true)
+          return downloadAndroidUpdate(update).then(() => setHasDownloadedAndroidUpdate(true))
+        }
+        return undefined
       })
       .catch((error: unknown) => {
         setAndroidUpdateError(error instanceof Error ? error.message : 'Não foi possível verificar atualizações.')
       })
-      .finally(() => setIsCheckingAndroidUpdate(false))
+      .finally(() => {
+        setIsCheckingAndroidUpdate(false)
+        setIsDownloadingAndroidUpdate(false)
+      })
   }
 
   const installAndroidUpdate = async () => {
@@ -648,11 +684,11 @@ function App() {
           <div className="app-update-panel" aria-live="polite">
             {androidUpdate && (
               <>
-                <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> Baixe para atualizar o Hub Principal.</p>
+                <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> O APK será baixado automaticamente.</p>
                 {androidUpdate.notes && <details className="app-update-notes"><summary>O que mudou</summary><p>{androidUpdate.notes}</p></details>}
                 <button className="app-update-button" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
                   <Download size={15} />
-                  {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar e atualizar'}
+                  {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar novamente'}
                 </button>
               </>
             )}
@@ -845,6 +881,7 @@ function App() {
 
       <footer>
         <strong>Hub Principal</strong>
+        {isAndroidApplication && <span>Versão do aplicativo: {installedAndroidAppVersion || 'verificando...'}</span>}
         <span>Dados meteorológicos fornecidos por serviços externos</span>
         <span>Fuso: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
       </footer>

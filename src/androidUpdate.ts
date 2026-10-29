@@ -42,8 +42,13 @@ const isNewerVersion = (candidate: string, current: string) => {
 
 export const isAndroidApp = () => Capacitor.getPlatform() === 'android'
 
-export const checkForAndroidUpdate = async (): Promise<AndroidUpdate | null> => {
+export const getInstalledAndroidAppVersion = async () => {
   const { versionName } = await androidUpdatePlugin.getAppVersion()
+  return versionName
+}
+
+export const checkForAndroidUpdate = async (): Promise<AndroidUpdate | null> => {
+  const versionName = await getInstalledAndroidAppVersion()
   let response: Response
   try {
     response = await fetch(`${updateManifestUrl}?t=${Date.now()}`, { cache: 'no-store' })

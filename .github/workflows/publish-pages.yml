@@ -1,0 +1,174 @@
+name: Publish GitHub Pages and Android updates
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - docs/**
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VITE_NEWS_API_URL: ${{ vars.VITE_NEWS_API_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager --install "platform-tools" "build-tools;36.0.0" "platforms;android-36"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Identify Android and manual APK changes
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            changed_files="$(git diff-tree --root --no-commit-id --name-only -r "$GITHUB_SHA")"
+          else
+            changed_files="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")"
+          fi
+
+          if grep -Fxq 'updates/Hub-Principal.apk' <<< "$changed_files"; then
+            echo "manual_apk=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "manual_apk=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if grep -Eq '^(apk/|src/|public/|index\.html$|package\.json$|package-lock\.json$|capacitor\.config\.)' <<< "$changed_files"; then
+            echo "android_code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "android_code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Preserve published APK and manifest
+        run: |
+          mkdir -p "$RUNNER_TEMP/current-update"
+          cp docs/updates/Hub-Principal.apk docs/updates/version.json "$RUNNER_TEMP/current-update/"
+
+      - name: Build GitHub Pages site
+        run: npm run build:pages
+
+      - name: Build and sign Android release
+        if: steps.changes.outputs.android_code == 'true' && steps.changes.outputs.manual_apk != 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ||
+                -z "${ANDROID_KEYSTORE_PASSWORD:-}" ||
+                -z "${ANDROID_KEY_ALIAS:-}" ||
+                -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo "::error::Android release secrets are missing. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD before publishing."
+            exit 1
+          fi
+
+          echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
+          echo "::add-mask::$ANDROID_KEY_ALIAS"
+          echo "::add-mask::$ANDROID_KEY_PASSWORD"
+          trap 'rm -f apk/release-signing.jks apk/release-signing.properties' EXIT
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > apk/release-signing.jks
+          chmod 600 apk/release-signing.jks
+          printf 'storeFile=release-signing.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" \
+            > apk/release-signing.properties
+          chmod 600 apk/release-signing.properties
+
+          npm run build
+          npx cap sync android
+          (
+            cd apk
+            ./gradlew --no-daemon assembleRelease
+          )
+          cp apk/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/Hub-Principal.apk"
+
+      - name: Validate and publish manually uploaded APK
+        if: steps.changes.outputs.manual_apk == 'true'
+        run: >-
+          node scripts/publish-android-update.mjs
+          updates/Hub-Principal.apk
+          "$RUNNER_TEMP/current-update/Hub-Principal.apk"
+          "$RUNNER_TEMP/current-update/version.json"
+          docs/updates
+
+      - name: Validate and publish signed release APK
+        if: steps.changes.outputs.android_code == 'true' && steps.changes.outputs.manual_apk != 'true'
+        run: >-
+          node scripts/publish-android-update.mjs
+          "$RUNNER_TEMP/Hub-Principal.apk"
+          "$RUNNER_TEMP/current-update/Hub-Principal.apk"
+          "$RUNNER_TEMP/current-update/version.json"
+          docs/updates
+
+      - name: Keep current APK when no Android release is needed
+        if: steps.changes.outputs.android_code != 'true' && steps.changes.outputs.manual_apk != 'true'
+        run: |
+          mkdir -p docs/updates
+          cp "$RUNNER_TEMP/current-update/"* docs/updates/
+
+      - name: Save published APK as the next validation baseline
+        if: steps.changes.outputs.android_code == 'true' || steps.changes.outputs.manual_apk == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/updates/Hub-Principal.apk docs/updates/version.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Android update"
+            git push origin HEAD:main
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

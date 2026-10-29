@@ -25,28 +25,24 @@ O arquivo será gerado em `apk/Hub-Principal-debug.apk` (e também em `apk/app/b
 
 ### Atualizações do aplicativo
 
-O app Android verifica `https://fadoco.github.io/Hub-Principal/updates/version.json` ao abrir e ao voltar para primeiro plano. Quando encontra uma versão mais nova, exibe um botão para baixar o APK publicado na pasta `docs/updates/`, verifica seu SHA-256 e abre o instalador do Android. A instalação sempre depende da confirmação do usuário; se necessário, o Android também pedirá permissão para instalar apps dessa fonte.
+O app Android verifica `https://fadoco.github.io/Hub-Principal/updates/version.json` ao abrir e ao voltar para primeiro plano. Quando encontra uma versão mais nova, baixa o APK em segundo plano e exibe **“Instalar atualização”**. O app verifica o SHA-256 antes de abrir o instalador; a instalação sempre depende da confirmação do usuário e, se necessário, da permissão do Android para instalar apps dessa fonte. Sem atualização, nenhum aviso é exibido.
 
-Para configurar a assinatura permanente uma única vez, execute no PowerShell:
+### Publicação automática de atualizações Android
 
-```powershell
-.\scripts\setup-android-signing.ps1
-```
+O workflow [.github/workflows/publish-pages.yml](./.github/workflows/publish-pages.yml) compila e assina o APK em um runner do GitHub quando o código do site ou Android muda na branch `main`, gera `docs/updates/version.json` e publica o site, o APK e o manifesto no GitHub Pages. O workflow também salva o último APK e manifesto em `docs/updates/` no repositório para validar corretamente a próxima versão. O processo não usa Android SDK, Java, GitHub CLI ou comandos locais durante a publicação.
 
-Isso cria uma chave e uma configuração locais, ignoradas pelo Git. Guarde cópias seguras de `apk/release-signing.jks` e `apk/release-signing.properties` em armazenamento criptografado: sem esses arquivos, não será possível assinar atualizações compatíveis com o app instalado. Não versione nem publique nenhum deles.
+Antes do primeiro build de release, configure uma única vez estes **Repository secrets** em **Settings → Secrets and variables → Actions**:
 
-Para preparar uma atualização, incremente `versionCode` e `versionName` em `apk/app/build.gradle`, gere o APK assinado e coloque-o na pasta `updates/`:
+- `ANDROID_KEYSTORE_BASE64`: conteúdo Base64 da keystore de publicação original (`apk/release-signing.jks`).
+- `ANDROID_KEYSTORE_PASSWORD`: senha de armazenamento da keystore.
+- `ANDROID_KEY_ALIAS`: alias da chave original.
+- `ANDROID_KEY_PASSWORD`: senha da chave original.
 
-```powershell
-$env:ANDROID_HOME = 'C:\Android\Sdk'
-$env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
-$env:JAVA_HOME = 'C:\Android\jdk-21'
-npm run build:android:release
-Copy-Item apk\app\build\outputs\apk\release\app-release.apk updates\Hub-Principal.apk
-npm run prepare:android-update
-```
+Transfira a keystore para Base64 apenas com uma ferramenta local confiável e offline; não use sites de conversão, não inclua os valores em arquivos ou comandos versionados e não os imprima em logs. Informe os valores diretamente nos campos de secrets do GitHub. Os dados de senha e alias podem ser obtidos da configuração local ignorada `apk/release-signing.properties`. O workflow reconstrói a keystore apenas durante o job, remove os arquivos temporários ao terminar e falha claramente se qualquer secret estiver ausente. **Não gere outra chave:** sem acesso seguro à keystore original, não é possível publicar atualizações compatíveis com instalações existentes.
 
-O último comando valida assinatura, identificador e versão do APK, calcula o SHA-256, compila o site e copia o APK para `docs/updates/` com o manifesto correspondente. Revise e envie ao GitHub as alterações do código e de `docs/`. O app detectará a atualização quando o GitHub Pages servir o manifesto e o APK novos. A assinatura deve continuar usando a chave local já configurada. O APK fica fora de `public/` para não ser empacotado dentro do próprio app.
+Configure também **Settings → Pages → Build and deployment → Source → GitHub Actions** e, em **Settings → Actions → General → Workflow permissions**, permita acesso de escrita ao conteúdo do repositório para o `GITHUB_TOKEN` (o workflow declara `contents: write`, além de `pages: write` e `id-token: write`). Se houver proteção na branch `main`, permita que o `GITHUB_TOKEN` salve o APK e o manifesto de referência. Para manter as manchetes no site publicado, cadastre `VITE_NEWS_API_URL` como uma Actions variable do repositório. Depois desses ajustes únicos, envie as alterações para `main`; para um novo release, incremente `versionCode` e `versionName` em `apk/app/build.gradle`.
+
+Como alternativa, envie pela interface web do GitHub um APK assinado para `updates/Hub-Principal.apk` e faça commit na branch `main`. O mesmo workflow valida pacote, assinatura, versão e SHA-256 contra o APK atualmente publicado, rejeita uma chave incompatível e atualiza o manifesto. O `versionCode` e a versão X.Y.Z precisam ser superiores aos publicados. O manifesto e o APK são publicados pelo GitHub Pages em `https://fadoco.github.io/Hub-Principal/updates/`; não é necessário editar ou enviar `docs/updates/` manualmente.
 
 ## Rodar localmente
 
@@ -91,7 +87,7 @@ Sem essa configuração, o Hub continua oferecendo links que abrem as buscas dir
 
 ## Publicação no GitHub Pages
 
-O build de publicação é gerado em `docs/`. Configure o GitHub Pages para publicar a pasta `docs` da branch principal, ou adapte seu workflow de deploy para gerar `npm run build:pages` com `VITE_NEWS_API_URL` configurada.
+O workflow do GitHub Actions gera o build em `docs/` e publica essa pasta no GitHub Pages automaticamente. `VITE_NEWS_API_URL`, quando configurada como Actions variable, também é usada no APK Android.
 
 O endereço atual do projeto é:
 
