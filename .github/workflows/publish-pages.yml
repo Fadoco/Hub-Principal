@@ -71,7 +71,7 @@ jobs:
             echo "manual_apk=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if grep -Eq '^(\.github/workflows/publish-pages\.yml$|apk/|src/|public/|index\.html$|package\.json$|package-lock\.json$|capacitor\.config\.)' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/publish-pages\.yml$|scripts/publish-android-update\.mjs$|apk/|src/|public/|index\.html$|package\.json$|package-lock\.json$|capacitor\.config\.)' <<< "$changed_files"; then
             echo "android_code=true" >> "$GITHUB_OUTPUT"
           else
             echo "android_code=false" >> "$GITHUB_OUTPUT"
