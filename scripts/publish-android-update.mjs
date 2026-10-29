@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 
@@ -14,15 +14,9 @@ if (!candidatePath || !referenceApkPath || !referenceManifestPath || !outputDire
 const sdkRoot = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT
 if (!sdkRoot) throw new Error('ANDROID_HOME ou ANDROID_SDK_ROOT não está configurado.')
 
-const buildToolsDirectory = path.join(sdkRoot, 'build-tools')
-const buildTools = readdirSync(buildToolsDirectory)
-  .filter((name) => /^\d+(\.\d+){1,3}$/.test(name))
-  .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }))
-  .map((name) => path.join(buildToolsDirectory, name))
-const aaptPath = buildTools.map((directory) => path.join(directory, process.platform === 'win32' ? 'aapt.exe' : 'aapt'))
-  .find(existsSync)
-const apksignerPath = buildTools.map((directory) => path.join(directory, process.platform === 'win32' ? 'apksigner.bat' : 'apksigner'))
-  .find(existsSync)
+const buildToolsDirectory = path.join(sdkRoot, 'build-tools', '36.0.0')
+const aaptPath = path.join(buildToolsDirectory, process.platform === 'win32' ? 'aapt.exe' : 'aapt')
+const apksignerPath = path.join(buildToolsDirectory, process.platform === 'win32' ? 'apksigner.bat' : 'apksigner')
 
 if (!aaptPath || !apksignerPath) {
   throw new Error('aapt e apksigner não foram encontrados no Android SDK.')
@@ -67,9 +61,12 @@ const inspectApk = (apkPath, description) => {
   }
 
   const signature = runTool(apksignerPath, ['verify', '--verbose', '--print-certs', apkPath], `Verificação da assinatura do ${description}`)
-  const digests = [...signature.matchAll(/Signer #\d+ certificate SHA-256 digest:\s*([a-f0-9]{64})/gi)]
+  const digests = [...signature.matchAll(/certificate\s+SHA-256\s+digest:\s*([a-f0-9]{64})/gi)]
     .map((match) => match[1].toLowerCase())
-  if (digests.length !== 1) throw new Error(`${description} não possui exatamente um certificado de assinatura verificável.`)
+  if (digests.length !== 1) {
+    const signerDetails = signature.split(/\r?\n/).filter((line) => /signer|sha.?256/i.test(line)).join(' | ')
+    throw new Error(`${description} não possui exatamente um certificado de assinatura verificável.${signerDetails ? ` Relatório: ${signerDetails}` : ''}`)
+  }
 
   return {
     version,
