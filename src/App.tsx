@@ -1124,6 +1124,11 @@ function App() {
       } : undefined}
       onTouchCancel={() => { pullStartY.current = null }}
     >
+      {isAndroidApplication && !isTvMode && (
+        <header className={`hero-header mobile-fixed-header theme-${mobilePreferences.theme}`}>
+          {androidHeaderContent}
+        </header>
+      )}
       {(!isAndroidApplication || isTvMode) && (
         <header className="hero-header">
           {isAndroidApplication ? androidHeaderContent : (
@@ -1152,12 +1157,6 @@ function App() {
             </>
           )}
         </header>
-      )}
-      {isAndroidApplication && !isTvMode && createPortal(
-        <header className={`hero-header mobile-fixed-header theme-${mobilePreferences.theme}`}>
-          {androidHeaderContent}
-        </header>,
-        document.body,
       )}
 
       {(!isAndroidApplication || activeMobileTab === 'home' || isTvMode) && <section className="content-grid">
