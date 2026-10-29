@@ -179,6 +179,7 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .rain-summary svg, .heavy-rain-alert svg { flex: 0 0 auto; margin-top: 1px; }
 .rain-summary p, .heavy-rain-alert p { display: grid; gap: 2px; }
 .rain-summary strong, .heavy-rain-alert strong { color: var(--ink); }
+.mobile-rain-alert { margin: 0 0 12px; }
 .daily-list { margin-top: 10px; }
 .day-item { align-items: center; border-bottom: 1px solid var(--line); column-gap: 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); padding: 11px 0; }
 .day-item span { color: var(--muted); font-size: 12px; text-transform: capitalize; }
@@ -329,6 +330,17 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .useful-card strong { font-size: 12px; font-weight: 650; }
 .useful-card small { color: var(--muted); font-size: 10px; line-height: 1.45; }
 .useful-card svg { color: var(--teal); flex: 0 0 auto; }
+.personal-sites-empty { align-items: center; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 9px; margin-bottom: 12px; padding: 22px 14px; text-align: center; }
+.personal-sites-empty svg { color: var(--teal); }
+.personal-sites-empty p { font-size: 12px; }
+.personal-site-row { align-items: stretch; display: flex; gap: 7px; min-width: 0; }
+.personal-site-row .useful-card { flex: 1; min-width: 0; }
+.personal-site-remove { align-items: center; background: rgba(255, 143, 143, .07); border: 1px solid rgba(255, 143, 143, .2); border-radius: 12px; color: #ffb3b3; display: inline-flex; flex: 0 0 42px; justify-content: center; }
+.personal-site-add { align-items: center; background: rgba(112, 226, 219, .1); border: 1px solid rgba(112, 226, 219, .25); border-radius: 13px; color: var(--teal-dark); display: inline-flex; font-size: 12px; font-weight: 650; gap: 8px; justify-content: center; margin-top: 12px; min-height: 46px; width: 100%; }
+.personal-site-form { background: rgba(9, 18, 31, .48); border: 1px solid var(--line); border-radius: 15px; margin-top: 10px; padding: 14px; }
+.personal-site-form .location-modal-label:not(:first-child) { margin-top: 12px; }
+.personal-site-form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.personal-sites-error { color: #ffb3b3; font-size: 11px; line-height: 1.45; margin-top: 9px; }
 
 footer { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: 11px; gap: 10px 20px; justify-content: space-between; padding: 22px 4px 0; }
 footer strong { color: var(--teal-dark); font-size: 11px; }
@@ -448,6 +460,248 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .useful-grid { grid-template-columns: minmax(0, 1fr); }
   .location-modal-backdrop { padding: 12px; }
   .location-modal { padding: 16px; }
+}
+.android-app {
+  margin: 0 auto;
+  max-width: 560px;
+  min-height: 100dvh;
+  padding: 0 16px calc(92px + env(safe-area-inset-bottom));
+}
+.android-app .hero-header {
+  backdrop-filter: blur(18px);
+  background: rgba(11, 18, 32, .94);
+  border-bottom: 1px solid rgba(190, 208, 231, .12);
+  margin: 0 -16px;
+  padding: max(16px, env(safe-area-inset-top)) 18px 12px;
+  position: sticky;
+  text-align: left;
+  top: 0;
+  z-index: 20;
+}
+.mobile-app-header { align-items: center; display: flex; justify-content: center; min-height: 94px; position: relative; }
+.favorite-city-shortcuts { display: flex; gap: 7px; margin: -4px 0 12px; overflow-x: auto; padding: 2px 0 5px; scrollbar-width: thin; }
+.favorite-city-chip { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 999px; color: var(--muted); cursor: pointer; display: inline-flex; flex: 0 0 auto; font-size: 10px; gap: 5px; min-height: 32px; padding: 0 10px; }
+.favorite-city-chip svg { color: var(--teal); }
+.favorite-city-chip.is-selected { background: rgba(112, 226, 219, .12); border-color: rgba(112, 226, 219, .45); color: var(--teal-dark); }
+.mobile-tv-exit {
+  align-items: center; background: rgba(99, 214, 207, .1); border: 1px solid rgba(99, 214, 207, .3);
+  border-radius: 999px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 11px;
+  font-weight: 650; gap: 5px; padding: 7px 10px; position: absolute; right: 0; top: 0;
+}
+.mobile-tv-exit:hover { background: rgba(99, 214, 207, .18); }
+.mobile-tv-exit svg { flex: 0 0 auto; }
+.android-app.tv-mode .mobile-app-header { padding-top: 36px; }
+.mobile-header-center { align-items: center; display: flex; flex-direction: column; gap: 3px; text-align: center; }
+.mobile-date { align-items: center; color: var(--muted); display: inline-flex; font-size: 12px; gap: 6px; justify-content: center; text-transform: capitalize; }
+.mobile-date svg { color: var(--teal); }
+.android-app .live-dot { height: 6px; width: 6px; }
+.android-app .clock { color: var(--teal-dark); font-size: 34px; font-weight: 650; letter-spacing: .025em; line-height: 1.1; margin: 0; }
+.mobile-connectivity { align-items: center; color: var(--teal-dark); display: inline-flex; font-size: 10px; gap: 5px; }
+.mobile-connectivity .live-dot { background: #62d4a0; }
+.mobile-connectivity.is-offline { color: #ffb6a4; }
+.mobile-connectivity.is-offline .live-dot { background: #ff8f8f; }
+.mobile-pull-status { color: var(--muted); font-size: 10px; margin-top: 8px; text-align: center; }
+.mobile-pull-status [role="alert"] { color: #ffaaaa; }
+.android-app .content-grid { gap: 12px; grid-template-columns: minmax(0, 1fr); margin-top: 14px; }
+.android-app .panel, .android-app .news-panel, .android-app .useful-sites, .android-app .radar-links-panel {
+  background: linear-gradient(155deg, rgba(23, 36, 57, .98), rgba(15, 25, 41, .98));
+  border: 1px solid rgba(190, 208, 231, .14);
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .16);
+  padding: 19px 17px;
+}
+.android-app .weather-panel > .section-heading { align-items: center; flex-direction: row; gap: 10px; }
+.android-app .weather-panel > .section-heading h2, .android-app .forecast-panel .section-heading h2 { font-size: 17px; }
+.android-app .weather-header-actions { gap: 7px; }
+.android-app .weather-header-actions .icon-button { display: none; }
+.android-app .location-button { border-radius: 999px; font-size: 10px; min-height: 36px; }
+.android-app .icon-button { border-radius: 50%; }
+.android-app .location-line { margin-bottom: 14px; }
+.android-app .current-weather {
+  background: radial-gradient(ellipse at 86% 16%, rgba(112, 226, 219, .15), transparent 54%), rgba(9, 18, 31, .62);
+  border: 1px solid rgba(112, 226, 219, .12);
+  border-radius: 18px;
+  gap: 14px;
+  margin: 0 0 14px;
+  min-height: 128px;
+  padding: 18px 14px;
+}
+.android-app .weather-symbol { background: rgba(244, 201, 107, .11); border: 0; border-radius: 16px; height: 56px; width: 56px; }
+.android-app .temperature { font-size: 44px; }
+.android-app .condition { font-size: 12px; }
+.android-app .feels { border-left-color: rgba(190, 208, 231, .17); font-size: 10px; margin-left: auto; padding-left: 12px; }
+.android-app .metric-grid { gap: 0 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.android-app .metric { min-height: 58px; padding: 9px 5px 8px 0; }
+.android-app .metric:not(:nth-child(2n+1)) { border-left: 1px solid var(--line); padding-left: 10px; }
+.android-app .metric small { font-size: 10px; }
+.android-app .metric strong { font-size: 12px; }
+.android-app .forecast-panel .section-heading { align-items: center; }
+.android-app .hourly-list { display: flex; gap: 7px; margin: 0 -4px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }
+.android-app .hour-item { background: rgba(9, 18, 31, .48); border: 1px solid rgba(190, 208, 231, .1); border-radius: 14px; flex: 0 0 68px; gap: 7px; padding: 10px 5px; }
+.android-app .hour-item span, .android-app .hour-item small { font-size: 9px; }
+.android-app .hour-item strong { font-size: 14px; }
+.android-app .daily-list { margin-top: 4px; }
+.android-app .day-item { grid-template-columns: minmax(0, .8fr) auto minmax(0, 1fr); padding: 12px 0; }
+.android-app .day-item strong { text-align: right; }
+.android-app .satellite-panel, .android-app .radar-links-panel, .android-app .useful-sites { margin-top: 14px; }
+.android-app .satellite-panel { padding: 15px; }
+.android-app .satellite-panel .section-heading { margin-bottom: 12px; }
+.android-app .satellite-viewer { border-radius: 15px; min-height: 210px; }
+.android-app .satellite-image { height: min(52vh, 430px); }
+.android-app .satellite-controls { align-items: center; flex-direction: row; }
+.android-app .satellite-buttons { width: auto; }
+.android-app .satellite-control-button { border-radius: 12px; min-height: 42px; }
+.android-app .satellite-timeline { margin: 10px 0 2px; }
+.android-app .satellite-attribution { align-items: flex-start; flex-direction: column; font-size: 10px; gap: 5px; }
+.android-app .radar-links-grid, .android-app .useful-grid { grid-template-columns: minmax(0, 1fr); }
+.android-app .useful-card { border-radius: 13px; min-height: 58px; }
+.mobile-tab-content { margin-top: 17px; }
+.mobile-view-heading { margin: 5px 2px 14px; }
+.mobile-view-heading .section-kicker { font-size: 9px; }
+.mobile-view-heading h2 { font-size: 24px; margin-top: 4px; }
+.mobile-view-heading p { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 5px; }
+.android-app .news-portals { gap: 12px; grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+.android-app .news-panel { padding: 16px; }
+.android-app .news-heading { align-items: center; flex-direction: row; }
+.android-app .news-actions { justify-content: flex-end; width: auto; }
+.mobile-more-screen { display: grid; gap: 14px; }
+.mobile-tv-toggle { align-items: center; background: linear-gradient(120deg, rgba(112, 226, 219, .11), rgba(23, 36, 57, .95)); border: 1px solid rgba(112, 226, 219, .25); border-radius: 16px; color: var(--teal-dark); display: flex; gap: 13px; min-height: 68px; padding: 13px 15px; text-align: left; }
+.mobile-tv-toggle > span { display: grid; gap: 4px; }
+.mobile-tv-toggle strong { color: var(--ink); font-size: 13px; }
+.mobile-tv-toggle small { color: var(--muted); font-size: 11px; }
+.mobile-personalize-button { align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; color: var(--teal-dark); cursor: pointer; display: flex; gap: 12px; min-height: 66px; padding: 13px 15px; text-align: left; }
+.mobile-personalize-button > span { display: grid; flex: 1; gap: 4px; }
+.mobile-personalize-button strong { color: var(--ink); font-size: 13px; }
+.mobile-personalize-button small { color: var(--muted); font-size: 11px; }
+.mobile-personalization-back { align-items: center; background: transparent; border: 1px solid var(--line); border-radius: 999px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 12px; gap: 5px; justify-self: start; min-height: 38px; padding: 0 12px; }
+.mobile-personalization-back svg { transform: rotate(180deg); }
+.mobile-preferences-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 17px; }
+.preferences-card-heading { display: grid; gap: 6px; margin-bottom: 12px; }
+.preferences-card-heading .section-kicker { font-size: 9px; }
+.preferences-card-heading h3 { font-size: 15px; }
+.preferences-card-heading p { color: var(--muted); font-size: 11px; line-height: 1.55; }
+.preference-toggle-row { align-items: center; color: var(--ink); display: flex; font-size: 12px; gap: 12px; justify-content: space-between; min-height: 44px; }
+.preference-toggle-row input, .preference-size-options input { accent-color: var(--teal); height: 18px; width: 18px; }
+.preference-list { border-top: 1px solid var(--line); }
+.preference-order-row { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
+.preference-order-row:last-child { border-bottom: 0; }
+.preference-order-row .preference-toggle-row { flex: 1; }
+.preference-order-actions { display: flex; gap: 5px; }
+.preference-order-actions button { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; color: var(--teal-dark); cursor: pointer; display: inline-flex; height: 34px; justify-content: center; width: 34px; }
+.preference-order-actions button:disabled { cursor: default; opacity: .4; }
+.preference-size-options { border: 0; display: flex; gap: 18px; margin: 0; padding: 0 0 10px; }
+.preference-size-options legend { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
+.preference-size-options label { align-items: center; color: var(--ink); display: inline-flex; font-size: 11px; gap: 7px; }
+.preference-size-options input { height: 16px; width: 16px; }
+.preference-storage-error, .preferences-empty-state { background: rgba(255, 143, 143, .1); border: 1px solid rgba(255, 143, 143, .25); border-radius: 12px; color: #ffd0d2; font-size: 11px; line-height: 1.5; padding: 12px; }
+.preferences-empty-state { grid-column: 1 / -1; }
+.android-app.high-contrast {
+  --page: #000;
+  --surface: #050505;
+  --surface-raised: #111;
+  --surface-soft: #080808;
+  --ink: #fff;
+  --muted: #fff;
+  --line: rgba(255, 255, 255, .62);
+  --teal: #80fff5;
+  --teal-dark: #a4fff8;
+}
+.android-app.high-contrast .panel,
+.android-app.high-contrast .news-panel,
+.android-app.high-contrast .useful-sites,
+.android-app.high-contrast .mobile-preferences-card,
+.android-app.high-contrast .mobile-about-card,
+.android-app.high-contrast .app-update-panel { background: #050505; border-color: rgba(255, 255, 255, .62); }
+.android-app.text-size-large .mobile-date,
+.android-app.text-size-large .mobile-view-heading p,
+.android-app.text-size-large .mobile-view-heading h2,
+.android-app.text-size-large .section-heading h2,
+.android-app.text-size-large .location-line,
+.android-app.text-size-large .location-button,
+.android-app.text-size-large .condition,
+.android-app.text-size-large .feels,
+.android-app.text-size-large .metric small,
+.android-app.text-size-large .metric strong,
+.android-app.text-size-large .metric em,
+.android-app.text-size-large .hour-item span,
+.android-app.text-size-large .hour-item small,
+.android-app.text-size-large .hour-item strong,
+.android-app.text-size-large .day-item > span,
+.android-app.text-size-large .day-item strong,
+.android-app.text-size-large .favorite-city-chip,
+.android-app.text-size-large .heavy-rain-alert,
+.android-app.text-size-large .mobile-preferences-card p,
+.android-app.text-size-large .preference-toggle-row,
+.android-app.text-size-large .preference-order-actions button,
+.android-app.text-size-large .preference-size-options label,
+.android-app.text-size-large .mobile-tv-toggle strong,
+.android-app.text-size-large .mobile-tv-toggle small,
+.android-app.text-size-large .mobile-about-card > p,
+.android-app.text-size-large .app-update-message,
+.android-app.text-size-large .mobile-nav-item { font-size: 1.15em; }
+.android-app.text-size-large .clock { font-size: 39px; }
+.android-app.text-size-large .temperature { font-size: 49px; }
+.android-app.text-size-large .preferences-card-heading h3 { font-size: 18px; }
+.android-app.text-size-large .preferences-card-heading .section-kicker { font-size: 10px; }
+.mobile-more-screen .useful-sites { margin: 0; }
+.mobile-more-screen .currency-panel { background: linear-gradient(155deg, rgba(23, 36, 57, .98), rgba(15, 25, 41, .98)); border: 1px solid rgba(190, 208, 231, .14); border-radius: 20px; margin: 0; padding: 18px 16px; }
+.mobile-about-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+.mobile-about-card h3, .mobile-update-heading h3 { font-size: 16px; margin-top: 6px; }
+.mobile-about-card > p { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.mobile-about-card .mobile-data-status { font-size: 10px; line-height: 1.5; }
+.mobile-update-heading { align-items: center; display: flex; justify-content: space-between; width: 100%; }
+.mobile-update-heading .section-kicker { font-size: 9px; }
+.mobile-auto-update { background: rgba(98, 212, 160, .1); border: 1px solid rgba(98, 212, 160, .2); border-radius: 999px; color: #8ce2b6; font-size: 10px; padding: 6px 9px; }
+.android-app .app-update-panel { align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; margin: 0; max-width: none; padding: 18px; text-align: left; }
+.android-app .app-update-notes summary { text-align: left; }
+.android-app .app-update-button, .android-app .app-update-check { border-radius: 12px; font-size: 12px; min-height: 42px; width: 100%; }
+.mobile-bottom-nav {
+  align-items: stretch;
+  backdrop-filter: blur(20px);
+  background: rgba(17, 28, 45, .96);
+  border-top: 1px solid rgba(190, 208, 231, .15);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  left: 0;
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+  position: fixed;
+  right: 0;
+  z-index: 100;
+}
+.mobile-nav-item { align-items: center; background: transparent; border: 0; border-radius: 13px; color: var(--muted); display: flex; flex-direction: column; font-size: 10px; gap: 4px; justify-content: center; min-height: 52px; }
+.mobile-nav-item.is-active { background: rgba(112, 226, 219, .1); color: var(--teal-dark); }
+@media (orientation: landscape) {
+  body.tv-mode-active { overflow: hidden; }
+  .android-app.tv-mode.app-shell {
+    display: grid; gap: 8px; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
+    grid-template-rows: 48px minmax(0, 1fr); height: 100vh; height: 100dvh;
+    max-width: none; overflow: hidden; padding: 6px 8px; width: 100%;
+  }
+  .android-app.tv-mode .hero-header {
+    background: transparent; border-bottom: 1px solid var(--line); grid-column: 1 / -1;
+    grid-row: 1; margin: 0; min-height: 0; padding: 0 6px; position: relative;
+  }
+  .android-app.tv-mode .mobile-app-header { min-height: 0; padding-top: 0; }
+  .android-app.tv-mode .mobile-header-center { gap: 0; }
+  .android-app.tv-mode .mobile-date { font-size: 10px; }
+  .android-app.tv-mode .clock { font-size: clamp(28px, 4vh, 40px); }
+  .android-app.tv-mode .mobile-connectivity, .android-app.tv-mode .mobile-pull-status { display: none; }
+  .android-app.tv-mode .mobile-pull-status.is-error {
+    background: var(--surface); border: 1px solid rgba(255, 143, 143, .4); border-radius: 8px;
+    display: block; left: 8px; padding: 8px; position: fixed; right: 8px; top: 54px; z-index: 30;
+  }
+  .android-app.tv-mode .mobile-tv-exit { font-size: 10px; padding: 6px 9px; top: 50%; transform: translateY(-50%); }
+  .android-app.tv-mode .content-grid { display: contents; }
+  .android-app.tv-mode .weather-panel {
+    grid-column: 1; grid-row: 2; height: 100%; margin: 0; min-height: 0; overflow-y: auto; padding: 9px;
+  }
+  .android-app.tv-mode .satellite-panel {
+    grid-column: 2; grid-row: 2; height: 100%; margin: 0; min-height: 0; padding: 9px;
+  }
+  .android-app.tv-mode .satellite-panel .section-heading { margin-bottom: 5px; }
+  .android-app.tv-mode .satellite-viewer { min-height: 0; }
+  .android-app.tv-mode .mobile-bottom-nav { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Activity, AlertCircle, CalendarDays, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, LocateFixed, MapPin, Monitor, Navigation, RefreshCw, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Activity, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronUp, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, Settings2, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
 import './App.css'
 import CurrencyPanel from './CurrencyPanel'
 import NewsPanel from './NewsPanel'
 import { handleExternalLink } from './openExternalUrl'
 import SatellitePanel from './SatellitePanel'
+import { setAndroidTvMode } from './androidTvMode'
 import {
   checkForAndroidUpdate,
   downloadAndroidUpdate,
@@ -27,9 +28,50 @@ type CitySuggestion = {
   searchKey: string
 }
 type WeatherData = { current: Record<string, number | string>; hourly: { time: string[]; temperature_2m: number[]; precipitation: number[]; precipitation_probability: number[]; weather_code: number[] }; daily: { time: string[]; weather_code: number[]; precipitation_probability_max: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; sunrise: string[]; sunset: string[] } }
+type PersonalSite = { name: string; url: string }
+type WeatherMetricId = 'humidity' | 'wind' | 'pressure' | 'precipitation' | 'visibility' | 'sunrise' | 'sunset' | 'uv' | 'clouds'
+type NewsCategoryId = 'local' | 'games' | 'films' | 'anime' | 'geek' | 'global'
+type MobilePreferences = {
+  rainAlerts: boolean
+  visibleMetrics: WeatherMetricId[]
+  metricOrder: WeatherMetricId[]
+  newsCategories: NewsCategoryId[]
+  textSize: 'normal' | 'large'
+  highContrast: boolean
+}
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const WEATHER_CACHE_TTL = 180000
 const FAVORITE_LOCATIONS_KEY = 'hub-favorite-locations'
+const PERSONAL_SITES_KEY = 'hub-personal-sites'
+const MOBILE_PREFERENCES_KEY = 'hub-mobile-preferences'
+const weatherMetricOptions: Array<{ id: WeatherMetricId; label: string }> = [
+  { id: 'humidity', label: 'Umidade' },
+  { id: 'wind', label: 'Vento' },
+  { id: 'pressure', label: 'Pressão' },
+  { id: 'precipitation', label: 'Chuva agora' },
+  { id: 'visibility', label: 'Visibilidade' },
+  { id: 'sunrise', label: 'Nascer do sol' },
+  { id: 'sunset', label: 'Pôr do sol' },
+  { id: 'uv', label: 'Índice UV' },
+  { id: 'clouds', label: 'Nuvens' },
+]
+const defaultMetricOrder = weatherMetricOptions.map(({ id }) => id)
+const newsCategoryOptions: Array<{ id: NewsCategoryId; label: string }> = [
+  { id: 'local', label: 'Notícias locais' },
+  { id: 'games', label: 'Jogos' },
+  { id: 'films', label: 'Filmes e cinema' },
+  { id: 'anime', label: 'Animes' },
+  { id: 'geek', label: 'Cultura geek' },
+  { id: 'global', label: 'Notícias globais' },
+]
+const defaultMobilePreferences: MobilePreferences = {
+  rainAlerts: true,
+  visibleMetrics: defaultMetricOrder.slice(0, 4),
+  metricOrder: defaultMetricOrder,
+  newsCategories: newsCategoryOptions.map(({ id }) => id),
+  textSize: 'normal',
+  highContrast: false,
+}
 const radarSources = [
   { label: 'Satélite meteorológico', description: 'Imagens e animação de satélite', url: 'https://www.ipmetradar.com.br/2satelite.php' },
   { label: 'Radar animado PPI', description: 'Animação das últimas imagens do radar', url: 'https://www.ipmetradar.com.br/2animRadar.php' },
@@ -51,6 +93,12 @@ const usefulSites = [
   { label: 'SAAEB', description: 'Serviços de água e esgoto', url: 'https://saaeb.com.br/' },
   { label: 'CPFL', description: 'Acesso e serviços CPFL', url: 'https://cpflb2cprd.b2clogin.com/cpflb2cprd.onmicrosoft.com/b2c_1a_signup_signin_mfa_front/oauth2/v2.0/authorize?p=B2C_1A_SIGNUP_SIGNIN_MFA_FRONT&client_id=17d5831d-6741-4670-8085-d1d34e37aec1&nonce=defaultNonce&redirect_uri=https%3A%2F%2Fwww.cpfl.com.br%2Fb2c-auth%2Freceive-token&scope=17d5831d-6741-4670-8085-d1d34e37aec1%20offline_access&response_type=code&prompt=login&response_mode=query' },
 ]
+const mobileTabs = [
+  { id: 'home', label: 'Início', icon: Home },
+  { id: 'satellite', label: 'Satélite', icon: Radio },
+  { id: 'news', label: 'Notícias', icon: Newspaper },
+  { id: 'more', label: 'Mais', icon: MoreHorizontal },
+] as const
 const weatherLabels: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina congelante', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada' }
 const WeatherIcon = ({ code, size = 24 }: { code: number; size?: number }) => code >= 95 ? <CloudRain size={size} /> : code >= 51 ? <CloudDrizzle size={size} /> : code === 0 ? <Sun size={size} /> : code <= 2 ? <CloudSun size={size} /> : <Cloud size={size} />
 const formatTime = (value: string | number | undefined) => value ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '--'
@@ -72,6 +120,41 @@ const readFavoriteLocations = (): FavoriteLocationsState => {
     return { items: parsed, error: '' }
   } catch {
     return { items: [], error: 'Não foi possível carregar as cidades favoritas salvas neste navegador.' }
+  }
+}
+const readMobilePreferences = () => {
+  try {
+    const saved = localStorage.getItem(MOBILE_PREFERENCES_KEY)
+    if (!saved) return { value: defaultMobilePreferences, error: '' }
+    const parsed: unknown = JSON.parse(saved)
+    if (!parsed || typeof parsed !== 'object') throw new Error('invalid-mobile-preferences')
+    const value = parsed as Partial<MobilePreferences>
+    const validMetrics = (items: unknown): items is WeatherMetricId[] =>
+      Array.isArray(items) && items.every((id) => defaultMetricOrder.includes(id))
+    const validCategories = (items: unknown): items is NewsCategoryId[] =>
+      Array.isArray(items) && items.every((id) => newsCategoryOptions.some((category) => category.id === id))
+    const metricOrder = validMetrics(value.metricOrder)
+      ? [...new Set(value.metricOrder), ...defaultMetricOrder.filter((id) => !value.metricOrder?.includes(id))]
+      : defaultMetricOrder
+    const visibleMetrics = validMetrics(value.visibleMetrics)
+      ? [...new Set(value.visibleMetrics)]
+      : defaultMobilePreferences.visibleMetrics
+    const newsCategories = validCategories(value.newsCategories)
+      ? [...new Set(value.newsCategories)]
+      : defaultMobilePreferences.newsCategories
+    return {
+      value: {
+        rainAlerts: typeof value.rainAlerts === 'boolean' ? value.rainAlerts : defaultMobilePreferences.rainAlerts,
+        visibleMetrics,
+        metricOrder,
+        newsCategories,
+        textSize: value.textSize === 'large' ? 'large' : 'normal',
+        highContrast: typeof value.highContrast === 'boolean' ? value.highContrast : false,
+      },
+      error: '',
+    }
+  } catch {
+    return { value: defaultMobilePreferences, error: 'Não foi possível carregar as preferências salvas.' }
   }
 }
 const getUvGuidance = (uvIndex: number | undefined) => {
@@ -195,6 +278,170 @@ function UsefulSites() {
   return <section className="useful-sites"><div className="useful-heading"><div><span className="section-kicker">ATALHOS RÁPIDOS</span><h2>Sites úteis</h2></div><span className="useful-count">{usefulSites.length} serviços</span></div><div className="useful-grid">{usefulSites.map((site) => <a className="useful-card" href={site.url} target="_blank" rel="noreferrer" onClick={(event) => handleExternalLink(event, site.url)} key={site.url}><span><strong>{site.label}</strong><small>{site.description}</small></span><ExternalLink size={16} /></a>)}</div></section>
 }
 
+function readPersonalSites() {
+  try {
+    const saved = localStorage.getItem(PERSONAL_SITES_KEY)
+    if (!saved) return { items: [] as PersonalSite[], error: '' }
+    const parsed: unknown = JSON.parse(saved)
+    if (!Array.isArray(parsed) || !parsed.every(isPersonalSite)) {
+      throw new Error('invalid-personal-sites')
+    }
+    return { items: parsed, error: '' }
+  } catch {
+    return { items: [] as PersonalSite[], error: 'Não foi possível carregar seus sites salvos neste aplicativo.' }
+  }
+}
+
+function isPersonalSite(value: unknown): value is PersonalSite {
+  if (!value || typeof value !== 'object') return false
+  const site = value as Partial<PersonalSite>
+  if (typeof site.name !== 'string' || typeof site.url !== 'string') return false
+  try {
+    const url = new URL(site.url)
+    return site.name.trim().length > 0 &&
+      ['http:', 'https:'].includes(url.protocol) &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password
+  } catch {
+    return false
+  }
+}
+
+function PersonalSites() {
+  const [saved, setSaved] = useState(readPersonalSites)
+  const [isAddingSite, setIsAddingSite] = useState(false)
+  const [name, setName] = useState('')
+  const [address, setAddress] = useState('')
+  const [formError, setFormError] = useState('')
+
+  const saveSites = (items: PersonalSite[]) => {
+    try {
+      localStorage.setItem(PERSONAL_SITES_KEY, JSON.stringify(items))
+      setSaved({ items, error: '' })
+      return true
+    } catch {
+      setSaved((current) => ({ ...current, error: 'Não foi possível salvar. Verifique o espaço disponível no aplicativo.' }))
+      return false
+    }
+  }
+
+  const addSite = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const siteName = name.trim()
+    const inputAddress = address.trim()
+    if (!siteName || !inputAddress) {
+      setFormError('Preencha o nome e o endereço do site.')
+      return
+    }
+    if (siteName.length > 50) {
+      setFormError('O nome deve ter até 50 caracteres.')
+      return
+    }
+
+    let url: URL
+    try {
+      url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(inputAddress) ? inputAddress : `https://${inputAddress}`)
+    } catch {
+      setFormError('Digite um endereço válido, como exemplo.com.')
+      return
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) {
+      setFormError('Use um endereço de site válido começando com http:// ou https://.')
+      return
+    }
+    if (saved.items.some((site) => site.url === url.toString())) {
+      setFormError('Esse site já está na sua lista.')
+      return
+    }
+
+    const items = [...saved.items, { name: siteName, url: url.toString() }]
+    if (!saveSites(items)) return
+    setName('')
+    setAddress('')
+    setFormError('')
+    setIsAddingSite(false)
+  }
+
+  const removeSite = (siteToRemove: PersonalSite) => {
+    saveSites(saved.items.filter((site) => site !== siteToRemove))
+  }
+
+  return (
+    <section className="useful-sites personal-sites">
+      <div className="useful-heading">
+        <div><span className="section-kicker">ATALHOS RÁPIDOS</span><h2>Meus sites</h2></div>
+        <span className="useful-count">{saved.items.length} {saved.items.length === 1 ? 'site' : 'sites'}</span>
+      </div>
+      {saved.error && <p className="personal-sites-error" role="alert">{saved.error}</p>}
+      {saved.items.length === 0 && !isAddingSite && (
+        <div className="personal-sites-empty">
+          <ExternalLink size={22} />
+          <p>Adicione aqui os sites que você mais usa.</p>
+        </div>
+      )}
+      {saved.items.length > 0 && (
+        <div className="useful-grid">
+          {saved.items.map((site) => (
+            <div className="personal-site-row" key={`${site.name}:${site.url}`}>
+              <a className="useful-card" href={site.url} target="_blank" rel="noopener noreferrer" onClick={(event) => handleExternalLink(event, site.url)}>
+                <span><strong>{site.name}</strong><small>{site.url.replace(/^https?:\/\//, '')}</small></span>
+                <ExternalLink size={16} />
+              </a>
+              <button
+                className="personal-site-remove"
+                type="button"
+                onClick={() => removeSite(site)}
+                aria-label={`Remover ${site.name}`}
+                title={`Remover ${site.name}`}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {isAddingSite && (
+        <form className="personal-site-form" onSubmit={addSite}>
+          <label className="location-modal-label" htmlFor="personal-site-name">Nome</label>
+          <input
+            id="personal-site-name"
+            className="location-modal-input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Ex.: Meu banco"
+            maxLength={50}
+            required
+          />
+          <label className="location-modal-label" htmlFor="personal-site-url">Link do site</label>
+          <input
+            id="personal-site-url"
+            className="location-modal-input"
+            type="text"
+            inputMode="url"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            placeholder="https://exemplo.com"
+            maxLength={2048}
+            required
+          />
+          {formError && <p className="personal-sites-error" role="alert">{formError}</p>}
+          <div className="personal-site-form-actions">
+            <button type="button" className="location-modal-secondary" onClick={() => { setIsAddingSite(false); setFormError('') }}>Cancelar</button>
+            <button type="submit" className="location-modal-primary">Salvar site</button>
+          </div>
+        </form>
+      )}
+      {!isAddingSite && (
+        <button className="personal-site-add" type="button" onClick={() => setIsAddingSite(true)}>
+          <Plus size={18} />
+          Adicionar site
+        </button>
+      )}
+    </section>
+  )
+}
+
 function normalizeVisibleEscapes(root: HTMLElement) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   const nodes: Text[] = []
@@ -236,9 +483,20 @@ function LiveClock() {
 }
 
 function App() {
+  const isAndroidPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('androidPreview') === '1'
+  const previewLocation: LocationInfo | null = isAndroidPreview
+    ? { latitude: -23.55, longitude: -46.63, city: 'São Paulo', state: 'São Paulo', country: 'Brasil' }
+    : null
+  const previewTab = isAndroidPreview
+    ? mobileTabs.find(({ id }) => id === new URLSearchParams(window.location.search).get('androidPreviewTab'))?.id
+    : undefined
   const [now, setNow] = useState(new Date())
-  const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(null)
-  const [location, setLocation] = useState<LocationInfo | null>(null)
+  const [activeMobileTab, setActiveMobileTab] = useState<(typeof mobileTabs)[number]['id']>(previewTab || 'home')
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false)
+  const pullStartY = useRef<number | null>(null)
+  const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(previewLocation)
+  const [location, setLocation] = useState<LocationInfo | null>(previewLocation)
   const [locationError, setLocationError] = useState('')
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [weatherError, setWeatherError] = useState('')
@@ -247,26 +505,42 @@ function App() {
   const [isResettingSite, setIsResettingSite] = useState(false)
   const [siteResetError, setSiteResetError] = useState('')
   const [favoriteLocations, setFavoriteLocations] = useState<FavoriteLocationsState>(readFavoriteLocations)
+  const [mobilePreferenceState, setMobilePreferenceState] = useState(readMobilePreferences)
   const [isCityModalOpen, setIsCityModalOpen] = useState(false)
+  const [isPersonalizationOpen, setIsPersonalizationOpen] = useState(false)
   const [isTvMode, setIsTvMode] = useState(false)
+  const [tvModeError, setTvModeError] = useState('')
   const [cityQuery, setCityQuery] = useState('')
   const [cityLookupError, setCityLookupError] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [selectedCitySuggestion, setSelectedCitySuggestion] = useState<CitySuggestion | null>(null)
   const [androidUpdate, setAndroidUpdate] = useState<AndroidUpdate | null>(null)
-  const [installedAndroidAppVersion, setInstalledAndroidAppVersion] = useState('')
+  const [installedAndroidAppVersion, setInstalledAndroidAppVersion] = useState(isAndroidPreview ? 'Prévia local' : '')
   const [androidUpdateError, setAndroidUpdateError] = useState('')
   const [androidUpdateStatus, setAndroidUpdateStatus] = useState('')
   const [isCheckingAndroidUpdate, setIsCheckingAndroidUpdate] = useState(isAndroidApp())
   const [isDownloadingAndroidUpdate, setIsDownloadingAndroidUpdate] = useState(false)
   const [hasDownloadedAndroidUpdate, setHasDownloadedAndroidUpdate] = useState(false)
-  const isAndroidApplication = isAndroidApp()
+  const isAndroidApplication = isAndroidApp() || isAndroidPreview
+  const mobilePreferences = mobilePreferenceState.value
   const localNewsCity = location?.city === 'Localização atual' ? null : location?.city || null
   const isCurrentLocationFavorite = Boolean(location && favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(location)))
+  const isNewsCategoryVisible = (category: NewsCategoryId) =>
+    !isAndroidApplication || mobilePreferences.newsCategories.includes(category)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine)
+    window.addEventListener('online', updateOnlineStatus)
+    window.addEventListener('offline', updateOnlineStatus)
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus)
+      window.removeEventListener('offline', updateOnlineStatus)
+    }
   }, [])
 
   useEffect(() => {
@@ -310,6 +584,41 @@ function App() {
     } catch {
       setFavoriteLocations({ items, error: 'Não foi possível salvar as favoritas no navegador. Elas ficarão disponíveis somente até fechar esta página.' })
     }
+  }
+
+  const updateMobilePreferences = (update: Partial<MobilePreferences>) => {
+    const next = { ...mobilePreferences, ...update }
+    try {
+      localStorage.setItem(MOBILE_PREFERENCES_KEY, JSON.stringify(next))
+      setMobilePreferenceState({ value: next, error: '' })
+    } catch {
+      setMobilePreferenceState((current) => ({ ...current, error: 'Não foi possível salvar as preferências neste aplicativo.' }))
+    }
+  }
+
+  const toggleWeatherMetric = (metric: WeatherMetricId) => {
+    const visibleMetrics = mobilePreferences.visibleMetrics.includes(metric)
+      ? mobilePreferences.visibleMetrics.filter((item) => item !== metric)
+      : [...mobilePreferences.visibleMetrics, metric]
+    updateMobilePreferences({ visibleMetrics })
+  }
+
+  const moveWeatherMetric = (metric: WeatherMetricId, direction: -1 | 1) => {
+    const index = mobilePreferences.metricOrder.indexOf(metric)
+    const nextIndex = index + direction
+    if (index < 0 || nextIndex < 0 || nextIndex >= mobilePreferences.metricOrder.length) return
+    const metricOrder = [...mobilePreferences.metricOrder]
+    const swappedMetric = metricOrder[index]
+    metricOrder[index] = metricOrder[nextIndex]
+    metricOrder[nextIndex] = swappedMetric
+    updateMobilePreferences({ metricOrder })
+  }
+
+  const toggleNewsCategory = (category: NewsCategoryId) => {
+    const newsCategories = mobilePreferences.newsCategories.includes(category)
+      ? mobilePreferences.newsCategories.filter((item) => item !== category)
+      : [...mobilePreferences.newsCategories, category]
+    updateMobilePreferences({ newsCategories })
   }
 
   const toggleCurrentLocationFavorite = () => {
@@ -468,7 +777,11 @@ function App() {
   }
 
   useEffect(() => { const root = document.querySelector<HTMLElement>('.app-shell'); if (root) normalizeVisibleEscapes(root) }, [])
-  useEffect(() => { loadCurrentLocation() }, [])
+  useEffect(() => {
+    if (!(import.meta.env.DEV && new URLSearchParams(window.location.search).get('androidPreview') === '1')) {
+      void loadCurrentLocation()
+    }
+  }, [])
   useEffect(() => {
     if (!isAndroidApp()) return
 
@@ -655,13 +968,86 @@ function App() {
       code === 65 || code === 82 || code >= 95
     )
   })
+  const metricData: Record<WeatherMetricId, { icon: ReactNode; value: string; detail?: string; tone?: string }> = {
+    humidity: { icon: <Droplets />, value: formatNumber(current?.relative_humidity_2m, '%') },
+    wind: { icon: <Wind />, value: formatNumber(current?.wind_speed_10m, ' km/h'), detail: `${formatNumber(current?.wind_direction_10m, '°')} direção` },
+    pressure: { icon: <Gauge />, value: formatNumber(current?.surface_pressure, ' hPa') },
+    precipitation: { icon: <Umbrella />, value: formatNumber(current?.precipitation, ' mm') },
+    visibility: { icon: <Eye />, value: formatNumber(current?.visibility, ' m') },
+    sunrise: { icon: <Sunrise />, value: formatTime(weather?.daily.sunrise[0]) },
+    sunset: { icon: <Sunset />, value: formatTime(weather?.daily.sunset[0]) },
+    uv: { icon: <Sun />, value: formatNumber(uvIndex), detail: uvGuidance ? `${uvGuidance.level} · ${uvGuidance.advice}` : 'Sem dados de UV', tone: uvGuidance?.tone },
+    clouds: { icon: <Activity />, value: formatNumber(current?.cloud_cover, '%') },
+  }
+  const visibleWeatherMetrics = isAndroidApplication
+    ? mobilePreferences.metricOrder.filter((id) => mobilePreferences.visibleMetrics.includes(id))
+    : defaultMetricOrder
   const daily = weather?.daily.time.slice(0, 5) || []
   const dateText = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(now)
   const isUsingCustomLocation = currentLocation && location ? (Math.abs(location.latitude - currentLocation.latitude) > 0.01 || Math.abs(location.longitude - currentLocation.longitude) > 0.01) : false
 
+  const toggleAndroidTvMode = async (enabled: boolean) => {
+    setTvModeError('')
+    try {
+      if (isAndroidApp()) await setAndroidTvMode(enabled)
+      setIsTvMode(enabled)
+      if (enabled) {
+        setActiveMobileTab('home')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    } catch (error) {
+      console.error('Não foi possível alterar a orientação do modo TV.', error)
+      setTvModeError('Não foi possível alterar a orientação. Tente novamente.')
+    }
+  }
+
   return (
-    <main className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}`} translate="no">
+    <main
+      className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ' android-app' : ''}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}${isAndroidApplication && mobilePreferences.highContrast ? ' high-contrast' : ''}`}
+      translate="no"
+      onTouchStart={isAndroidApplication ? (event) => {
+        pullStartY.current = window.scrollY <= 2 ? event.touches[0]?.clientY ?? null : null
+      } : undefined}
+      onTouchEnd={isAndroidApplication ? (event) => {
+        const startY = pullStartY.current
+        const endY = event.changedTouches[0]?.clientY
+        pullStartY.current = null
+        if (startY === null || endY === undefined || endY - startY < 76 || !location || loadingWeather) return
+        setIsPullRefreshing(true)
+        void loadWeather(location, true).finally(() => setIsPullRefreshing(false))
+      } : undefined}
+      onTouchCancel={() => { pullStartY.current = null }}
+    >
       <header className="hero-header">
+        {isAndroidApplication ? (
+          <>
+            <div className="mobile-app-header">
+              {isTvMode && (
+                <button
+                  className="mobile-tv-exit"
+                  type="button"
+                  onClick={() => void toggleAndroidTvMode(false)}
+                  aria-label="Sair do modo TV"
+                >
+                  <X size={16} />
+                  <span>Sair do modo TV</span>
+                </button>
+              )}
+              <div className="mobile-header-center">
+                <div className="mobile-date"><CalendarDays size={14} /> {dateText}</div>
+                <LiveClock />
+                <span className={`mobile-connectivity${isOnline ? '' : ' is-offline'}`}>
+                  <span className="live-dot" />
+                  {isOnline ? 'Online' : 'Offline'}
+                </span>
+              </div>
+            </div>
+            <div className={`mobile-pull-status${tvModeError ? ' is-error' : ''}`} aria-live="polite">
+              {tvModeError ? <span role="alert">{tvModeError}</span> : isPullRefreshing ? 'Atualizando clima...' : 'Puxe para baixo para atualizar'}
+            </div>
+          </>
+        ) : (
+          <>
         {!isAndroidApplication && (
           <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
             <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
@@ -683,9 +1069,11 @@ function App() {
         <p className="auto-refresh-note">Atualização automática a cada 30 minutos</p>
         <InstallApp />
         {!isAndroidApplication && siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
+          </>
+        )}
       </header>
 
-      <section className="content-grid">
+      {(!isAndroidApplication || activeMobileTab === 'home' || isTvMode) && <section className="content-grid">
         <section className="panel weather-panel">
           <div className="section-heading">
             <div>
@@ -726,6 +1114,26 @@ function App() {
             <div className="notice"><LocateFixed size={16} /> {locationError || 'Solicitando sua localização...'}</div>
           )}
 
+          {isAndroidApplication && favoriteLocations.items.length > 0 && (
+            <div className="favorite-city-shortcuts" aria-label="Cidades favoritas">
+              {favoriteLocations.items.map((favorite) => {
+                const isSelected = Boolean(location && getLocationKey(favorite) === getLocationKey(location))
+                return (
+                  <button
+                    className={`favorite-city-chip${isSelected ? ' is-selected' : ''}`}
+                    key={getLocationKey(favorite)}
+                    type="button"
+                    onClick={() => selectFavoriteLocation(favorite)}
+                    aria-pressed={isSelected}
+                  >
+                    <Star size={13} fill="currentColor" />
+                    {formatLocationLabel(favorite)}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           {isUsingCustomLocation && (
             <button className="location-override-button" type="button" onClick={backToCurrentLocation}>Voltar à localização atual</button>
           )}
@@ -736,6 +1144,15 @@ function App() {
 
           {weather && (
             <>
+              {isAndroidApplication && mobilePreferences.rainAlerts && heavyRainForecast && (
+                <div className="heavy-rain-alert mobile-rain-alert" role="status" aria-live="polite">
+                  <AlertCircle size={17} />
+                  <p>
+                    <strong>Alerta de chuva forte</strong>
+                    Possível às {formatTime(weather.hourly.time[heavyRainForecast.index])}, com {formatNumber(weather.hourly.precipitation_probability[heavyRainForecast.index], '%')} de chance.
+                  </p>
+                </div>
+              )}
               <div className="current-weather">
                 <div className="weather-symbol"><WeatherIcon code={currentCode} size={46} /></div>
                 <div>
@@ -750,17 +1167,10 @@ function App() {
                 <span>Maior chance de chuva hoje</span>
                 <strong>{formatNumber(highestRainChanceToday?.probability, '%')}</strong>
               </div>
-
               <div className="metric-grid">
-                <Metric icon={<Droplets />} label="Umidade" value={formatNumber(current?.relative_humidity_2m, '%')} />
-                <Metric icon={<Wind />} label="Vento" value={formatNumber(current?.wind_speed_10m, ' km/h')} detail={`${formatNumber(current?.wind_direction_10m, '°')} direção`} />
-                <Metric icon={<Gauge />} label="Pressão" value={formatNumber(current?.surface_pressure, ' hPa')} />
-                <Metric icon={<Umbrella />} label="Chuva agora" value={formatNumber(current?.precipitation, ' mm')} />
-                <Metric icon={<Eye />} label="Visibilidade" value={formatNumber(current?.visibility, ' m')} />
-                <Metric icon={<Sunrise />} label="Nascer do sol" value={formatTime(weather?.daily.sunrise[0])} />
-                <Metric icon={<Sunset />} label="Pôr do sol" value={formatTime(weather?.daily.sunset[0])} />
-                <Metric icon={<Sun />} label="Índice UV" value={formatNumber(uvIndex)} detail={uvGuidance ? `${uvGuidance.level} · ${uvGuidance.advice}` : 'Sem dados de UV'} tone={uvGuidance?.tone} />
-                <Metric icon={<Activity />} label="Nuvens" value={formatNumber(current?.cloud_cover, '%')} />
+                {visibleWeatherMetrics.map((id) => (
+                  <Metric key={id} label={weatherMetricOptions.find((metric) => metric.id === id)?.label || id} {...metricData[id]} />
+                ))}
               </div>
               <CurrencyPanel />
             </>
@@ -789,7 +1199,7 @@ function App() {
             </div>
           )}
 
-          {heavyRainForecast && (
+          {heavyRainForecast && (!isAndroidApplication || mobilePreferences.rainAlerts) && (
             <div className="heavy-rain-alert" role="status" aria-live="polite">
               <AlertCircle size={17} />
               <p>
@@ -830,8 +1240,10 @@ function App() {
             })}
           </div>
         </section>
-      </section>
+      </section>}
 
+      {(!isAndroidApplication || activeMobileTab === 'satellite' || isTvMode) && (
+        <>
       <SatellitePanel />
 
       <section className="radar-links-panel">
@@ -847,47 +1259,202 @@ function App() {
           ))}
         </div>
       </section>
-
-      <div className="news-portals">
-        <NewsPanel locationCity={localNewsCity} locationState={location?.state ? getStateAbbreviation(location.state) : null} local title={localNewsCity && location ? `Notícias de ${formatLocationLabel(location)}` : 'Notícias da sua região'} query="notícias locais" />
-        <NewsPanel locationCity={location?.city || null} title="Portal de notícias de jogos" query={newsSearchQueries.games} />
-        <NewsPanel locationCity={location?.city || null} title="Portal de notícias de filmes e cinema" query={newsSearchQueries.films} />
-        <NewsPanel locationCity={location?.city || null} title="Portal de notícias de animes" query={newsSearchQueries.anime} />
-        <NewsPanel locationCity={location?.city || null} title="Portal de notícias do mundo geek" query={newsSearchQueries.geek} />
-        <NewsPanel locationCity={location?.city || null} title="Portal de notícias globais" query={newsSearchQueries.global} />
-      </div>
-
-      <UsefulSites />
-
-      {isAndroidApplication && (
-        <div className="app-update-panel" aria-live="polite">
-          {androidUpdate && (
-            <>
-              <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> O APK será baixado automaticamente.</p>
-              {androidUpdate.notes && <details className="app-update-notes"><summary>O que mudou</summary><p>{androidUpdate.notes}</p></details>}
-              <button className="app-update-button" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
-                <Download size={15} />
-                {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar novamente'}
-              </button>
-            </>
-          )}
-          {androidUpdateStatus && <p className="app-update-message" role="status">{androidUpdateStatus}</p>}
-          {androidUpdateError && <p className="app-update-error" role="alert">{androidUpdateError}</p>}
-          {!androidUpdate && (
-            <button className="app-update-check" type="button" onClick={checkAndroidUpdateManually} disabled={isCheckingAndroidUpdate}>
-              <RefreshCw size={14} className={isCheckingAndroidUpdate ? 'spin' : ''} />
-              {isCheckingAndroidUpdate ? 'Verificando atualização...' : 'Verificar atualizações'}
-            </button>
-          )}
-        </div>
+        </>
       )}
 
-      <footer>
+      {(!isAndroidApplication || activeMobileTab === 'news') && <div className={isAndroidApplication ? 'mobile-tab-content' : undefined}>
+      {isAndroidApplication && <div className="mobile-view-heading"><span className="section-kicker">ATUALIDADES</span><h2>Notícias</h2><p>Manchetes para acompanhar o que acontece.</p></div>}
+      <div className="news-portals">
+        {isNewsCategoryVisible('local') && <NewsPanel locationCity={localNewsCity} locationState={location?.state ? getStateAbbreviation(location.state) : null} local title={localNewsCity && location ? `Notícias de ${formatLocationLabel(location)}` : 'Notícias da sua região'} query="notícias locais" />}
+        {isNewsCategoryVisible('games') && <NewsPanel locationCity={location?.city || null} title="Portal de notícias de jogos" query={newsSearchQueries.games} />}
+        {isNewsCategoryVisible('films') && <NewsPanel locationCity={location?.city || null} title="Portal de notícias de filmes e cinema" query={newsSearchQueries.films} />}
+        {isNewsCategoryVisible('anime') && <NewsPanel locationCity={location?.city || null} title="Portal de notícias de animes" query={newsSearchQueries.anime} />}
+        {isNewsCategoryVisible('geek') && <NewsPanel locationCity={location?.city || null} title="Portal de notícias do mundo geek" query={newsSearchQueries.geek} />}
+        {isNewsCategoryVisible('global') && <NewsPanel locationCity={location?.city || null} title="Portal de notícias globais" query={newsSearchQueries.global} />}
+        {isAndroidApplication && mobilePreferences.newsCategories.length === 0 && <p className="preferences-empty-state">Nenhum assunto selecionado. Escolha os temas em Mais → Personalização.</p>}
+      </div>
+      </div>}
+
+      {isAndroidApplication && activeMobileTab === 'more' && (
+        <section className="mobile-tab-content mobile-more-screen">
+          <div className="mobile-view-heading">
+            <span className="section-kicker">{isPersonalizationOpen ? 'PREFERÊNCIAS' : 'APLICATIVO'}</span>
+            <h2>{isPersonalizationOpen ? 'Personalização' : 'Mais'}</h2>
+            <p>{isPersonalizationOpen ? 'Ajuste o clima, as notícias e a leitura do seu jeito.' : 'Atalhos, informações e atualizações do aplicativo.'}</p>
+          </div>
+          {!isPersonalizationOpen && <button
+            className="mobile-tv-toggle"
+            type="button"
+            onClick={() => void toggleAndroidTvMode(!isTvMode)}
+            aria-pressed={isTvMode}
+          >
+            {isTvMode ? <X size={19} /> : <Monitor size={19} />}
+            <span>
+              <strong>{isTvMode ? 'Sair do modo TV' : 'Ativar modo TV'}</strong>
+              <small>{isTvMode ? 'Voltar à visualização normal' : 'Clima e satélite em tela ampliada'}</small>
+            </span>
+          </button>}
+          {!isPersonalizationOpen && (
+            <button className="mobile-personalize-button" type="button" onClick={() => setIsPersonalizationOpen(true)}>
+              <Settings2 size={20} />
+              <span><strong>Personalização</strong><small>Alertas, cartões, notícias e acessibilidade</small></span>
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          {isPersonalizationOpen && (
+            <button className="mobile-personalization-back" type="button" onClick={() => setIsPersonalizationOpen(false)}>
+              <ChevronLeft size={18} />
+              Voltar
+            </button>
+          )}
+          {isPersonalizationOpen && <section className="mobile-preferences-card">
+            <div className="preferences-card-heading">
+              <span className="section-kicker">CLIMA E ALERTAS</span>
+              <h3>Alertas de chuva forte</h3>
+              <p>Mostra um aviso no app quando houver previsão de chuva intensa. O alerta aparece enquanto o app estiver aberto.</p>
+            </div>
+            <label className="preference-toggle-row">
+              <span>Exibir alertas de chuva forte</span>
+              <input
+                type="checkbox"
+                checked={mobilePreferences.rainAlerts}
+                onChange={(event) => updateMobilePreferences({ rainAlerts: event.target.checked })}
+              />
+            </label>
+          </section>}
+          {isPersonalizationOpen && <section className="mobile-preferences-card">
+            <div className="preferences-card-heading">
+              <span className="section-kicker">TELA INICIAL E MODO TV</span>
+              <h3>Cartões do clima</h3>
+              <p>Escolha os dados exibidos e ajuste a ordem. A seleção também vale para o modo TV.</p>
+            </div>
+            <div className="preference-list">
+              {mobilePreferences.metricOrder.map((metric, index) => {
+                const label = weatherMetricOptions.find((option) => option.id === metric)?.label || metric
+                return (
+                  <div className="preference-order-row" key={metric}>
+                    <label className="preference-toggle-row">
+                      <span>{label}</span>
+                      <input
+                        type="checkbox"
+                        checked={mobilePreferences.visibleMetrics.includes(metric)}
+                        onChange={() => toggleWeatherMetric(metric)}
+                      />
+                    </label>
+                    <div className="preference-order-actions">
+                      <button type="button" aria-label={`Mover ${label} para cima`} onClick={() => moveWeatherMetric(metric, -1)} disabled={index === 0}><ChevronUp size={17} /></button>
+                      <button type="button" aria-label={`Mover ${label} para baixo`} onClick={() => moveWeatherMetric(metric, 1)} disabled={index === mobilePreferences.metricOrder.length - 1}><ChevronDown size={17} /></button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>}
+          {isPersonalizationOpen && <section className="mobile-preferences-card">
+            <div className="preferences-card-heading">
+              <span className="section-kicker">NOTÍCIAS</span>
+              <h3>Seus assuntos</h3>
+              <p>Mostramos somente as categorias selecionadas na aba Notícias.</p>
+            </div>
+            <div className="preference-list">
+              {newsCategoryOptions.map(({ id, label }) => (
+                <label className="preference-toggle-row" key={id}>
+                  <span>{label}</span>
+                  <input
+                    type="checkbox"
+                    checked={mobilePreferences.newsCategories.includes(id)}
+                    onChange={() => toggleNewsCategory(id)}
+                  />
+                </label>
+              ))}
+            </div>
+          </section>}
+          {isPersonalizationOpen && <section className="mobile-preferences-card">
+            <div className="preferences-card-heading">
+              <span className="section-kicker">ACESSIBILIDADE</span>
+              <h3>Leitura e contraste</h3>
+              <p>Ajustes visuais salvos somente neste aplicativo.</p>
+            </div>
+            <fieldset className="preference-size-options">
+              <legend>Tamanho do texto</legend>
+              <label><input type="radio" name="mobile-text-size" checked={mobilePreferences.textSize === 'normal'} onChange={() => updateMobilePreferences({ textSize: 'normal' })} /> Padrão</label>
+              <label><input type="radio" name="mobile-text-size" checked={mobilePreferences.textSize === 'large'} onChange={() => updateMobilePreferences({ textSize: 'large' })} /> Maior</label>
+            </fieldset>
+            <label className="preference-toggle-row">
+              <span>Alto contraste</span>
+              <input
+                type="checkbox"
+                checked={mobilePreferences.highContrast}
+                onChange={(event) => updateMobilePreferences({ highContrast: event.target.checked })}
+              />
+            </label>
+          </section>}
+          {isPersonalizationOpen && mobilePreferenceState.error && <p className="preference-storage-error" role="alert">{mobilePreferenceState.error}</p>}
+          {!isPersonalizationOpen && <PersonalSites />}
+          {!isPersonalizationOpen && <section className="mobile-about-card">
+            <span className="section-kicker">SOBRE O APLICATIVO</span>
+            <h3>Hub Principal</h3>
+            <p>Versão {installedAndroidAppVersion || 'verificando...'}</p>
+            <p className="mobile-data-status">{isOnline ? 'Conectado à internet' : 'Sem conexão com a internet'}</p>
+          </section>}
+          {!isPersonalizationOpen && <div className="app-update-panel" aria-live="polite">
+            <div className="mobile-update-heading">
+              <div><span className="section-kicker">ATUALIZAÇÕES</span><h3>Atualização do app</h3></div>
+              <span className="mobile-auto-update">Automática</span>
+            </div>
+            {androidUpdate && (
+              <>
+                <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> O APK será baixado automaticamente.</p>
+                {androidUpdate.notes && <details className="app-update-notes"><summary>O que mudou</summary><p>{androidUpdate.notes}</p></details>}
+                <button className="app-update-button" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
+                  <Download size={15} />
+                  {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar novamente'}
+                </button>
+              </>
+            )}
+            {androidUpdateStatus && <p className="app-update-message" role="status">{androidUpdateStatus}</p>}
+            {androidUpdateError && <p className="app-update-error" role="alert">{androidUpdateError}</p>}
+            {!androidUpdate && (
+              <>
+                <p className="app-update-message">O aplicativo verifica atualizações ao abrir e ao voltar para primeiro plano.</p>
+                <button className="app-update-check" type="button" onClick={checkAndroidUpdateManually} disabled={isCheckingAndroidUpdate || !isAndroidApp()}>
+                  <RefreshCw size={14} className={isCheckingAndroidUpdate ? 'spin' : ''} />
+                  {isCheckingAndroidUpdate ? 'Verificando atualização...' : isAndroidPreview ? 'Verificação no app instalado' : 'Verificar agora'}
+                </button>
+              </>
+            )}
+          </div>}
+        </section>
+      )}
+
+      {!isAndroidApplication && <UsefulSites />}
+
+      {!isAndroidApplication && <footer>
         <strong>Hub Principal</strong>
-        {isAndroidApplication && <span>Versão do aplicativo: {installedAndroidAppVersion || 'verificando...'}</span>}
         <span>Dados meteorológicos fornecidos por serviços externos</span>
         <span>Fuso: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
-      </footer>
+      </footer>}
+
+      {isAndroidApplication && (
+        <nav className="mobile-bottom-nav" aria-label="Navegação principal">
+          {mobileTabs.map(({ id, label, icon: Icon }) => (
+            <button
+              className={`mobile-nav-item${activeMobileTab === id ? ' is-active' : ''}`}
+              key={id}
+              type="button"
+              onClick={() => {
+                setActiveMobileTab(id)
+                setIsPersonalizationOpen(false)
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              aria-current={activeMobileTab === id ? 'page' : undefined}
+            >
+              <Icon size={20} strokeWidth={activeMobileTab === id ? 2.4 : 1.8} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
 
       {isCityModalOpen && (
         <div className="location-modal-backdrop" onClick={() => setIsCityModalOpen(false)}>
