@@ -44,10 +44,12 @@ export const isAndroidApp = () => Capacitor.getPlatform() === 'android'
 
 export const checkForAndroidUpdate = async (): Promise<AndroidUpdate | null> => {
   const { versionName } = await androidUpdatePlugin.getAppVersion()
-  const response = await fetch(`${updateManifestUrl}?t=${Date.now()}`, {
-    cache: 'no-store',
-    headers: { 'Cache-Control': 'no-cache' },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${updateManifestUrl}?t=${Date.now()}`, { cache: 'no-store' })
+  } catch (error) {
+    throw new Error('Não foi possível consultar a pasta de atualizações. Verifique a conexão com a internet.', { cause: error })
+  }
 
   if (response.status === 404) return null
   if (!response.ok) throw new Error(`O servidor de atualizações respondeu com erro ${response.status}.`)

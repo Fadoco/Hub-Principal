@@ -25,7 +25,7 @@ O arquivo será gerado em `apk/Hub-Principal-debug.apk` (e também em `apk/app/b
 
 ### Atualizações do aplicativo
 
-O app Android verifica `https://fadoco.github.io/Hub-Principal/updates/version.json` ao abrir e ao voltar para primeiro plano. Quando encontra uma versão mais nova, exibe um botão para baixar o APK da pasta `public/updates/`, verifica seu SHA-256 e abre o instalador do Android. A instalação sempre depende da confirmação do usuário; se necessário, o Android também pedirá permissão para instalar apps dessa fonte.
+O app Android verifica `https://fadoco.github.io/Hub-Principal/updates/version.json` ao abrir e ao voltar para primeiro plano. Quando encontra uma versão mais nova, exibe um botão para baixar o APK publicado na pasta `docs/updates/`, verifica seu SHA-256 e abre o instalador do Android. A instalação sempre depende da confirmação do usuário; se necessário, o Android também pedirá permissão para instalar apps dessa fonte.
 
 Para configurar a assinatura permanente uma única vez, execute no PowerShell:
 
@@ -35,18 +35,18 @@ Para configurar a assinatura permanente uma única vez, execute no PowerShell:
 
 Isso cria uma chave e uma configuração locais, ignoradas pelo Git. Guarde cópias seguras de `apk/release-signing.jks` e `apk/release-signing.properties` em armazenamento criptografado: sem esses arquivos, não será possível assinar atualizações compatíveis com o app instalado. Não versione nem publique nenhum deles.
 
-Para preparar uma atualização, incremente `versionCode` e `versionName` em `apk/app/build.gradle`, gere o APK assinado e coloque-o em `public/updates/Hub-Principal.apk`:
+Para preparar uma atualização, incremente `versionCode` e `versionName` em `apk/app/build.gradle`, gere o APK assinado e coloque-o na pasta `updates/`:
 
 ```powershell
 $env:ANDROID_HOME = 'C:\Android\Sdk'
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 $env:JAVA_HOME = 'C:\Android\jdk-21'
 npm run build:android:release
-Copy-Item apk\app\build\outputs\apk\release\app-release.apk public\updates\Hub-Principal.apk
+Copy-Item apk\app\build\outputs\apk\release\app-release.apk updates\Hub-Principal.apk
 npm run prepare:android-update
 ```
 
-O último comando valida assinatura, identificador e versão do APK, calcula o SHA-256 e gera o manifesto; também atualiza o build em `docs/`, publicado pelo GitHub Pages. Revise e envie ao GitHub as alterações do código, de `public/updates/` e de `docs/`. O app detectará a atualização quando o site publicado servir o manifesto e o APK novos. A assinatura deve continuar usando a chave local já configurada.
+O último comando valida assinatura, identificador e versão do APK, calcula o SHA-256, compila o site e copia o APK para `docs/updates/` com o manifesto correspondente. Revise e envie ao GitHub as alterações do código e de `docs/`. O app detectará a atualização quando o GitHub Pages servir o manifesto e o APK novos. A assinatura deve continuar usando a chave local já configurada. O APK fica fora de `public/` para não ser empacotado dentro do próprio app.
 
 ## Rodar localmente
 

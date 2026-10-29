@@ -3,9 +3,9 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 Push-Location $projectRoot
 try {
-    $apkPath = Join-Path $projectRoot 'public\updates\Hub-Principal.apk'
+    $apkPath = Join-Path $projectRoot 'updates\Hub-Principal.apk'
     if (-not (Test-Path -LiteralPath $apkPath -PathType Leaf)) {
-        throw 'Coloque o APK assinado em public\updates\Hub-Principal.apk antes de continuar.'
+        throw 'Coloque o APK assinado em updates\Hub-Principal.apk antes de continuar.'
     }
 
     $sdk = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } elseif ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { 'C:\Android\Sdk' }
@@ -50,7 +50,6 @@ try {
     }
 
     $hash = (Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    $manifestPath = Join-Path $projectRoot 'public\updates\version.json'
     $manifest = [ordered]@{
         version = $apkVersionName
         versionCode = $apkVersionCode
@@ -58,15 +57,21 @@ try {
         sha256 = $hash
         notes = ''
     }
-    $json = $manifest | ConvertTo-Json
-    $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($manifestPath, $json + [Environment]::NewLine, $utf8WithoutBom)
 
     & npm run build:pages
     if ($LASTEXITCODE -ne 0) { throw 'Não foi possível gerar o site para publicar o APK.' }
 
+    $publishedUpdateDirectory = Join-Path $projectRoot 'docs\updates'
+    New-Item -ItemType Directory -Force -Path $publishedUpdateDirectory | Out-Null
+    Copy-Item -LiteralPath $apkPath -Destination (Join-Path $publishedUpdateDirectory 'Hub-Principal.apk') -Force
+
+    $manifestPath = Join-Path $publishedUpdateDirectory 'version.json'
+    $json = $manifest | ConvertTo-Json
+    $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($manifestPath, $json + [Environment]::NewLine, $utf8WithoutBom)
+
     Write-Output "Manifesto criado para Hub Principal $apkVersionName (versionCode $apkVersionCode)."
-    Write-Output 'Agora revise e envie as alterações de public\updates e docs\ ao GitHub.'
+    Write-Output 'Agora revise e envie as alterações do código, de updates\ e de docs\ ao GitHub.'
 }
 finally {
     Pop-Location
