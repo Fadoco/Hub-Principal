@@ -56,6 +56,20 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
   font-weight: 650; gap: 7px; margin-top: 15px; padding: 9px 13px; transition: background .18s, border-color .18s;
 }
 .install-button:hover { background: rgba(99, 214, 207, .14); border-color: var(--teal); }
+.app-update-panel { align-items: center; display: flex; flex-direction: column; gap: 9px; margin: 14px auto 0; max-width: 520px; }
+.app-update-message, .app-update-error { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.app-update-message strong { color: var(--teal-dark); }
+.app-update-error { color: #ffb3b3; }
+.app-update-button, .app-update-check {
+  align-items: center; background: rgba(99, 214, 207, .08); border: 1px solid rgba(99, 214, 207, .3);
+  border-radius: 7px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 11px;
+  font-weight: 650; gap: 7px; justify-content: center; padding: 9px 13px;
+}
+.app-update-button:hover:not(:disabled), .app-update-check:hover:not(:disabled) { background: rgba(99, 214, 207, .14); border-color: var(--teal); }
+.app-update-button:disabled, .app-update-check:disabled { cursor: progress; opacity: .7; }
+.app-update-notes { color: var(--muted); font-size: 11px; line-height: 1.5; text-align: left; }
+.app-update-notes summary { cursor: pointer; text-align: center; }
+.app-update-notes p { margin-top: 6px; white-space: pre-line; }
 .cache-reset-button {
   align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
   color: var(--ink); cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 650;

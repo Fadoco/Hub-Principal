@@ -22,6 +22,9 @@ apk/app/src/main/assets/capacitor.config.json
 apk/app/src/main/assets/capacitor.plugins.json
 apk/capacitor-cordova-android-plugins/
 apk/Hub-Principal-debug.apk
+apk/Hub-Principal.apk
+apk/release-signing.jks
+apk/release-signing.properties
 
 # Editor directories and files
 .vscode/*

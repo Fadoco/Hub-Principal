@@ -5,6 +5,13 @@ import CurrencyPanel from './CurrencyPanel'
 import NewsPanel from './NewsPanel'
 import { handleExternalLink } from './openExternalUrl'
 import SatellitePanel from './SatellitePanel'
+import {
+  checkForAndroidUpdate,
+  downloadAndroidUpdate,
+  installDownloadedAndroidUpdate,
+  isAndroidApp,
+  type AndroidUpdate,
+} from './androidUpdate'
 
 type Coordinates = { latitude: number; longitude: number }
 type LocationInfo = Coordinates & { city: string; state: string; country: string }
@@ -245,6 +252,13 @@ function App() {
   const [cityLookupError, setCityLookupError] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [selectedCitySuggestion, setSelectedCitySuggestion] = useState<CitySuggestion | null>(null)
+  const [androidUpdate, setAndroidUpdate] = useState<AndroidUpdate | null>(null)
+  const [androidUpdateError, setAndroidUpdateError] = useState('')
+  const [androidUpdateStatus, setAndroidUpdateStatus] = useState('')
+  const [isCheckingAndroidUpdate, setIsCheckingAndroidUpdate] = useState(isAndroidApp())
+  const [isDownloadingAndroidUpdate, setIsDownloadingAndroidUpdate] = useState(false)
+  const [hasDownloadedAndroidUpdate, setHasDownloadedAndroidUpdate] = useState(false)
+  const isAndroidApplication = isAndroidApp()
   const localNewsCity = location?.city === 'Localização atual' ? null : location?.city || null
   const isCurrentLocationFavorite = Boolean(location && favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(location)))
 
@@ -453,6 +467,81 @@ function App() {
 
   useEffect(() => { const root = document.querySelector<HTMLElement>('.app-shell'); if (root) normalizeVisibleEscapes(root) }, [])
   useEffect(() => { loadCurrentLocation() }, [])
+  useEffect(() => {
+    if (!isAndroidApp()) return
+
+    let lastCheck = 0
+    let disposed = false
+    const checkForUpdate = async (force = false) => {
+      if (!force && Date.now() - lastCheck < 6 * 60 * 60 * 1000) return
+      lastCheck = Date.now()
+
+      try {
+        const update = await checkForAndroidUpdate()
+        if (disposed) return
+        setAndroidUpdateError('')
+        setAndroidUpdate(update)
+        setHasDownloadedAndroidUpdate(false)
+        setAndroidUpdateStatus(update ? '' : 'O aplicativo está atualizado.')
+      } catch (error) {
+        if (disposed) return
+        setAndroidUpdateError(error instanceof Error ? error.message : 'Não foi possível verificar atualizações.')
+      } finally {
+        if (!disposed) setIsCheckingAndroidUpdate(false)
+      }
+    }
+
+    void checkForUpdate(true)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void checkForUpdate()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      disposed = true
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  const checkAndroidUpdateManually = () => {
+    setAndroidUpdateStatus('')
+    setAndroidUpdateError('')
+    setIsCheckingAndroidUpdate(true)
+    void checkForAndroidUpdate()
+      .then((update) => {
+        setAndroidUpdate(update)
+        setHasDownloadedAndroidUpdate(false)
+        setAndroidUpdateStatus(update ? '' : 'O aplicativo está atualizado.')
+      })
+      .catch((error: unknown) => {
+        setAndroidUpdateError(error instanceof Error ? error.message : 'Não foi possível verificar atualizações.')
+      })
+      .finally(() => setIsCheckingAndroidUpdate(false))
+  }
+
+  const installAndroidUpdate = async () => {
+    setAndroidUpdateError('')
+    setAndroidUpdateStatus('')
+    try {
+      if (!hasDownloadedAndroidUpdate) {
+        if (!androidUpdate) return
+        setIsDownloadingAndroidUpdate(true)
+        await downloadAndroidUpdate(androidUpdate)
+        setHasDownloadedAndroidUpdate(true)
+      }
+
+      const result = await installDownloadedAndroidUpdate()
+      if (result.status === 'permission_required') {
+        setAndroidUpdateStatus('Permita que o Hub Principal instale apps nesta tela de configurações. Depois, volte e toque em “Instalar atualização”.')
+      } else {
+        setAndroidUpdateStatus('Confirme a atualização na tela do Android.')
+      }
+    } catch (error) {
+      setAndroidUpdateError(error instanceof Error ? error.message : 'Não foi possível baixar ou iniciar a atualização.')
+    } finally {
+      setIsDownloadingAndroidUpdate(false)
+    }
+  }
 
   const loadWeather = async (coordinates: Coordinates, forceRefresh = false) => {
     setLoadingWeather(true)
@@ -555,6 +644,28 @@ function App() {
         <p className="timezone">Horário local do seu dispositivo</p>
         <p className="auto-refresh-note">Atualização automática a cada 30 minutos</p>
         <InstallApp />
+        {isAndroidApplication && (
+          <div className="app-update-panel" aria-live="polite">
+            {androidUpdate && (
+              <>
+                <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> Baixe para atualizar o Hub Principal.</p>
+                {androidUpdate.notes && <details className="app-update-notes"><summary>O que mudou</summary><p>{androidUpdate.notes}</p></details>}
+                <button className="app-update-button" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
+                  <Download size={15} />
+                  {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar e atualizar'}
+                </button>
+              </>
+            )}
+            {androidUpdateStatus && <p className="app-update-message" role="status">{androidUpdateStatus}</p>}
+            {androidUpdateError && <p className="app-update-error" role="alert">{androidUpdateError}</p>}
+            {!androidUpdate && (
+              <button className="app-update-check" type="button" onClick={checkAndroidUpdateManually} disabled={isCheckingAndroidUpdate}>
+                <RefreshCw size={14} className={isCheckingAndroidUpdate ? 'spin' : ''} />
+                {isCheckingAndroidUpdate ? 'Verificando atualização...' : 'Verificar atualizações'}
+              </button>
+            )}
+          </div>
+        )}
         {siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
       </header>
 
