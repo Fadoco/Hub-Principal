@@ -18,7 +18,7 @@ const buildToolsDirectory = path.join(sdkRoot, 'build-tools', '36.0.0')
 const aaptPath = path.join(buildToolsDirectory, process.platform === 'win32' ? 'aapt.exe' : 'aapt')
 const apksignerPath = path.join(buildToolsDirectory, process.platform === 'win32' ? 'apksigner.bat' : 'apksigner')
 
-if (!aaptPath || !apksignerPath) {
+if (!existsSync(aaptPath) || !existsSync(apksignerPath)) {
   throw new Error('aapt e apksigner não foram encontrados no Android SDK.')
 }
 

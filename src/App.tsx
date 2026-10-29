@@ -662,10 +662,12 @@ function App() {
   return (
     <main className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}`} translate="no">
       <header className="hero-header">
-        <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
-          <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
-          <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
-        </button>
+        {!isAndroidApplication && (
+          <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
+            <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
+            <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
+          </button>
+        )}
         <button
           className="tv-mode-button"
           type="button"
@@ -680,29 +682,7 @@ function App() {
         <p className="timezone">Horário local do seu dispositivo</p>
         <p className="auto-refresh-note">Atualização automática a cada 30 minutos</p>
         <InstallApp />
-        {isAndroidApplication && (
-          <div className="app-update-panel" aria-live="polite">
-            {androidUpdate && (
-              <>
-                <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> O APK será baixado automaticamente.</p>
-                {androidUpdate.notes && <details className="app-update-notes"><summary>O que mudou</summary><p>{androidUpdate.notes}</p></details>}
-                <button className="app-update-button" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
-                  <Download size={15} />
-                  {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar novamente'}
-                </button>
-              </>
-            )}
-            {androidUpdateStatus && <p className="app-update-message" role="status">{androidUpdateStatus}</p>}
-            {androidUpdateError && <p className="app-update-error" role="alert">{androidUpdateError}</p>}
-            {!androidUpdate && (
-              <button className="app-update-check" type="button" onClick={checkAndroidUpdateManually} disabled={isCheckingAndroidUpdate}>
-                <RefreshCw size={14} className={isCheckingAndroidUpdate ? 'spin' : ''} />
-                {isCheckingAndroidUpdate ? 'Verificando atualização...' : 'Verificar atualizações'}
-              </button>
-            )}
-          </div>
-        )}
-        {siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
+        {!isAndroidApplication && siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
       </header>
 
       <section className="content-grid">
@@ -878,6 +858,29 @@ function App() {
       </div>
 
       <UsefulSites />
+
+      {isAndroidApplication && (
+        <div className="app-update-panel" aria-live="polite">
+          {androidUpdate && (
+            <>
+              <p className="app-update-message"><strong>Versão {androidUpdate.version} disponível.</strong> O APK será baixado automaticamente.</p>
+              {androidUpdate.notes && <details className="app-update-notes"><summary>O que mudou</summary><p>{androidUpdate.notes}</p></details>}
+              <button className="app-update-button" type="button" onClick={() => void installAndroidUpdate()} disabled={isDownloadingAndroidUpdate}>
+                <Download size={15} />
+                {isDownloadingAndroidUpdate ? 'Baixando atualização...' : hasDownloadedAndroidUpdate ? 'Instalar atualização' : 'Baixar novamente'}
+              </button>
+            </>
+          )}
+          {androidUpdateStatus && <p className="app-update-message" role="status">{androidUpdateStatus}</p>}
+          {androidUpdateError && <p className="app-update-error" role="alert">{androidUpdateError}</p>}
+          {!androidUpdate && (
+            <button className="app-update-check" type="button" onClick={checkAndroidUpdateManually} disabled={isCheckingAndroidUpdate}>
+              <RefreshCw size={14} className={isCheckingAndroidUpdate ? 'spin' : ''} />
+              {isCheckingAndroidUpdate ? 'Verificando atualização...' : 'Verificar atualizações'}
+            </button>
+          )}
+        </div>
+      )}
 
       <footer>
         <strong>Hub Principal</strong>
