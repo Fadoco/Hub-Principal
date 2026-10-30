@@ -1025,3 +1025,245 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+.app-shell:not(.android-app):not(.tv-mode) {
+  --page: #0b1220;
+  --surface: #111c2d;
+  --surface-raised: #172439;
+  --surface-soft: #0e1929;
+  --ink: #f5f8fc;
+  --muted: #c0cede;
+  --line: rgba(190, 208, 231, .22);
+  --teal: #70e2db;
+  --teal-dark: #a8f0e9;
+  --coral: #ff8f8f;
+  --shadow: 0 18px 44px rgba(0, 0, 0, .18);
+  background: radial-gradient(ellipse at 50% -25%, rgba(53, 107, 142, .2), transparent 52%), var(--page);
+  max-width: 1440px;
+  padding: 22px clamp(18px, 3vw, 42px) 48px;
+}
+.app-shell.site-theme-dark:not(.android-app) {
+  --page: #000;
+  --surface: #080808;
+  --surface-raised: #151515;
+  --surface-soft: #040404;
+  --ink: #f5f7fa;
+  --muted: #c0c6ce;
+  --line: rgba(255, 255, 255, .18);
+  --shadow: 0 18px 44px rgba(0, 0, 0, .48);
+  background: #000;
+}
+html:has(.app-shell.site-theme-dark:not(.android-app)),
+body:has(.app-shell.site-theme-dark:not(.android-app)) { background: #000; }
+.app-shell.site-theme-light:not(.android-app) {
+  color-scheme: light;
+  --page: #f2f5f8;
+  --surface: #fff;
+  --surface-raised: #e8eef2;
+  --surface-soft: #f4f7f9;
+  --ink: #172033;
+  --muted: #4a5668;
+  --line: rgba(33, 48, 69, .2);
+  --teal: #087f82;
+  --teal-dark: #075e63;
+  --coral: #b63c48;
+  --shadow: 0 16px 38px rgba(23, 32, 51, .1);
+  background: radial-gradient(ellipse at 50% -25%, rgba(8, 127, 130, .08), transparent 52%), var(--page);
+}
+.app-shell:not(.android-app):not(.tv-mode) .hero-header {
+  display: grid;
+  gap: 0;
+  padding: 20px 10px 16px;
+  text-align: left;
+}
+.site-header-main {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  width: 100%;
+}
+.site-brand { align-items: center; display: flex; gap: 12px; min-width: 0; }
+.site-brand-icon {
+  align-items: center; background: rgba(112, 226, 219, .1); border: 1px solid rgba(112, 226, 219, .25);
+  border-radius: 8px; color: var(--teal); display: flex; flex: 0 0 44px; height: 44px; justify-content: center;
+}
+.site-brand-copy { display: grid; gap: 4px; min-width: 0; }
+.app-shell:not(.android-app):not(.tv-mode) .site-brand h1 { font-size: 19px; font-weight: 700; letter-spacing: 0; line-height: 1.15; margin: 0; }
+.site-brand-copy small { color: var(--muted); font-size: 10px; }
+.site-clock-group { align-items: center; display: grid; gap: 3px; justify-items: center; min-width: 250px; }
+.site-clock-group .date-line { font-size: 12px; }
+.site-clock-group .clock { font-size: 38px; line-height: 1; margin: 0; }
+.site-clock-group .timezone { font-size: 10px; margin: 1px 0 0; }
+.site-header-actions { align-items: center; display: flex; gap: 8px; justify-content: flex-end; }
+.site-header-actions .cache-reset-button,
+.site-header-actions .tv-mode-button {
+  border-radius: 6px; font-size: 10px; min-height: 36px; position: static;
+}
+  .site-header-actions .tv-mode-button { background: rgba(112, 226, 219, .08); }
+.app-shell:not(.android-app):not(.tv-mode) .auto-refresh-note { font-size: 10px; justify-self: center; margin: 9px 0 0; }
+.app-shell:not(.android-app):not(.tv-mode) .install-button { justify-self: center; margin-top: 10px; }
+.app-shell:not(.android-app):not(.tv-mode) .site-reset-error { grid-column: 1; margin: 8px 0 0; }
+.site-theme-picker { flex: 0 0 auto; position: relative; }
+.site-theme-picker > summary {
+  align-items: center; background: rgba(99, 214, 207, .06); border: 1px solid rgba(99, 214, 207, .25);
+  border-radius: 6px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 10px;
+  font-weight: 600; gap: 6px; list-style: none; min-height: 36px; padding: 0 9px;
+}
+.site-theme-picker > summary::-webkit-details-marker { display: none; }
+.site-theme-picker > summary:hover { background: rgba(99, 214, 207, .13); border-color: rgba(99, 214, 207, .5); }
+.site-theme-picker > summary svg { color: var(--teal); }
+.site-theme-options {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+  display: grid; gap: 3px; margin: 0; min-width: 190px; padding: 11px; position: absolute; right: 0;
+  top: calc(100% + 7px); z-index: 40;
+}
+.site-theme-options legend { color: var(--muted); font-size: 10px; padding: 0 4px; }
+.site-theme-options label {
+  align-items: center; border-radius: 5px; color: var(--ink); cursor: pointer; display: flex;
+  font-size: 11px; gap: 8px; min-height: 30px; padding: 3px 4px;
+}
+.site-theme-options label:hover { background: var(--surface-raised); }
+.site-theme-options input { accent-color: var(--teal); height: 15px; margin: 0; width: 15px; }
+.site-theme-swatch { border: 1px solid var(--line); border-radius: 4px; height: 16px; width: 16px; }
+.swatch-original { background: #70e2db; }
+.swatch-dark { background: #151a22; }
+.swatch-light { background: #f2f5f8; }
+.site-theme-options p { color: var(--coral); font-size: 10px; line-height: 1.4; margin-top: 4px; }
+.tv-mode .site-header-main,
+.tv-mode .site-clock-group,
+.tv-mode .site-header-actions { display: contents; }
+.tv-mode .site-brand { display: none; }
+.app-shell:not(.android-app):not(.tv-mode) .content-grid {
+  gap: 20px; grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr); margin-top: 24px;
+}
+.app-shell:not(.android-app):not(.tv-mode) .panel,
+.app-shell:not(.android-app):not(.tv-mode) .news-panel,
+.app-shell:not(.android-app):not(.tv-mode) .radar-links-panel {
+  background: linear-gradient(145deg, rgba(20, 33, 52, .96), rgba(15, 26, 42, .96));
+  border-color: var(--line);
+  border-radius: 8px; box-shadow: 0 14px 34px rgba(0, 0, 0, .2);
+}
+.app-shell.site-theme-dark:not(.android-app) .panel,
+.app-shell.site-theme-dark:not(.android-app) .news-panel,
+.app-shell.site-theme-dark:not(.android-app) .radar-links-panel {
+  background: #080808; border-color: var(--line); box-shadow: var(--shadow);
+}
+.app-shell.site-theme-dark:not(.android-app) .current-weather { background: #030303; border-color: rgba(255, 255, 255, .12); }
+.app-shell.site-theme-dark:not(.android-app) .hour-item,
+.app-shell.site-theme-dark:not(.android-app) .currency-row { background: #050505; border-color: var(--line); }
+.app-shell.site-theme-dark:not(.android-app) .satellite-viewer { background: #000; }
+.app-shell.site-theme-dark:not(.android-app) .website-app-options { background: #050505; }
+.app-shell.site-theme-dark:not(.android-app) .website-app-option { background: #090909; border-color: var(--line); }
+.app-shell:not(.android-app):not(.tv-mode) .weather-panel { border-top-color: rgba(112, 226, 219, .46); }
+.app-shell:not(.android-app):not(.tv-mode) .forecast-panel { border-top-color: rgba(244, 201, 107, .4); }
+.app-shell:not(.android-app):not(.tv-mode) .satellite-panel { border-top-color: rgba(112, 226, 219, .32); }
+.app-shell:not(.android-app):not(.tv-mode) .panel { padding: 22px; }
+.app-shell:not(.android-app):not(.tv-mode) .news-portals { gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.app-shell:not(.android-app):not(.tv-mode) .news-panel { padding: 18px; }
+.app-shell.site-theme-light:not(.android-app) .panel,
+.app-shell.site-theme-light:not(.android-app) .news-panel,
+.app-shell.site-theme-light:not(.android-app) .radar-links-panel {
+  background: #fff; border-color: var(--line); box-shadow: 0 12px 30px rgba(23, 32, 51, .08);
+}
+.app-shell.site-theme-light:not(.android-app) .current-weather { background: #f1f7f7; border-color: rgba(8, 127, 130, .2); }
+.app-shell.site-theme-light:not(.android-app) .hour-item,
+.app-shell.site-theme-light:not(.android-app) .currency-row { background: #f6f8fa; border-color: var(--line); }
+.website-app-options {
+  border-top: 1px solid var(--line); margin-top: 18px; padding-top: 10px;
+}
+.website-app-trigger {
+  align-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--ink);
+  cursor: pointer; display: flex; gap: 12px; justify-content: space-between; min-height: 48px;
+  padding: 6px 8px; text-align: left; width: 100%;
+}
+.website-app-trigger:hover { background: rgba(112, 226, 219, .05); }
+.website-app-trigger-copy { display: grid; gap: 3px; }
+.website-app-trigger-copy .section-kicker { font-size: 9px; }
+.website-app-trigger-copy strong { font-size: 12px; }
+.website-app-trigger-action { align-items: center; color: var(--teal-dark); display: inline-flex; flex: 0 0 auto; font-size: 10px; gap: 6px; }
+.website-app-trigger-action svg { color: var(--teal); transition: transform .18s ease; }
+.website-app-trigger-action svg.is-open { transform: rotate(180deg); }
+.website-app-options-content { padding: 4px 8px 8px; }
+.website-app-options-content[hidden] { display: none; }
+.website-app-heading { margin-bottom: 10px; }
+.website-app-heading p { color: var(--muted); font-size: 10px; }
+.website-app-heading p { color: var(--muted); font-size: 10px; }
+.website-app-options-grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.website-app-option {
+  align-items: center; background: rgba(8, 13, 21, .22); border: 1px solid var(--line); border-radius: 6px;
+  display: flex; gap: 11px; min-width: 0; padding: 11px 12px;
+}
+.website-app-option-icon {
+  align-items: center; background: rgba(112, 226, 219, .1); border-radius: 6px; color: var(--teal);
+  display: flex; flex: 0 0 36px; height: 36px; justify-content: center;
+}
+.website-app-option-icon.android-option-icon { background: rgba(244, 201, 107, .11); color: #f4c96b; }
+.website-app-option-copy { align-items: center; display: flex; flex: 1; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.website-app-option-copy h3 { color: var(--ink); font-size: 11px; width: 100%; }
+.website-app-option-copy p, .install-hint { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.website-app-option-copy .install-button { margin: 2px 0 0 auto; min-height: 30px; padding: 0 9px; }
+.install-hint { margin-left: auto; }
+.android-download-button {
+  align-items: center; background: rgba(244, 201, 107, .1); border: 1px solid rgba(244, 201, 107, .25);
+  border-radius: 6px; color: var(--ink); display: inline-flex; font-size: 10px; font-weight: 650;
+  gap: 6px; margin: 2px 0 0 auto; min-height: 30px; padding: 0 9px; text-decoration: none;
+}
+.android-download-button:hover { border-color: rgba(244, 201, 107, .55); }
+.android-download-button svg { color: #f4c96b; }
+.app-shell.site-theme-light:not(.android-app) .website-app-options { border-top-color: var(--line); }
+.app-shell.site-theme-light:not(.android-app) .website-app-trigger:hover { background: rgba(8, 127, 130, .045); }
+.app-shell.site-theme-light:not(.android-app) .website-app-option { background: #f4f7f9; }
+.app-shell:not(.android-app) .website-city-shortcuts {
+  flex-wrap: wrap; margin: -4px 0 16px; overflow: visible; padding: 2px 0;
+}
+.app-shell:not(.android-app) .website-city-shortcuts .favorite-city-chip { border-radius: 6px; min-height: 30px; }
+.site-metric-picker { flex: 0 0 auto; position: relative; }
+.site-metric-picker > summary {
+  align-items: center; background: rgba(99, 214, 207, .06); border: 1px solid rgba(99, 214, 207, .25);
+  border-radius: 6px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 11px;
+  font-weight: 600; gap: 6px; list-style: none; min-height: 36px; padding: 0 10px;
+}
+.site-metric-picker > summary::-webkit-details-marker { display: none; }
+.site-metric-picker > summary:hover { background: rgba(99, 214, 207, .13); border-color: rgba(99, 214, 207, .5); }
+.site-metric-picker > summary svg { color: var(--teal); }
+.site-metric-options {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+  display: grid; gap: 3px; margin: 0; min-width: 224px; padding: 12px; position: absolute; right: 0;
+  top: calc(100% + 7px); z-index: 40;
+}
+.site-metric-options legend { color: var(--muted); font-size: 10px; padding: 0 4px; }
+.site-metric-options label { align-items: center; border-radius: 5px; color: var(--ink); cursor: pointer; display: flex; font-size: 11px; gap: 9px; min-height: 30px; padding: 3px 4px; }
+.site-metric-options label:hover { background: var(--surface-raised); }
+.site-metric-options input { accent-color: var(--teal); height: 15px; width: 15px; }
+.site-metric-options p { color: #ffb3b3; font-size: 10px; line-height: 1.4; margin-top: 5px; }
+@media (max-width: 1100px) {
+  .app-shell:not(.android-app):not(.tv-mode) .news-portals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 980px) {
+  .app-shell:not(.android-app):not(.tv-mode) .content-grid { grid-template-columns: minmax(0, 1fr); }
+  .app-shell:not(.android-app):not(.tv-mode) .site-header-main { gap: 14px; grid-template-columns: minmax(0, 1fr) auto; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-brand { grid-column: 1; grid-row: 1; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-clock-group { grid-column: 2; grid-row: 1; min-width: 0; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-header-actions { grid-column: 1 / -1; grid-row: 2; justify-content: space-between; }
+  .app-shell:not(.android-app):not(.tv-mode) .hero-header { padding: 18px 6px 16px; }
+}
+@media (max-width: 800px) {
+  .app-shell:not(.android-app):not(.tv-mode) .news-portals { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .app-shell:not(.android-app):not(.tv-mode) { padding: 10px 12px 24px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-brand { gap: 8px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-brand-icon { flex-basis: 38px; height: 38px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-brand h1 { font-size: 16px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-brand-copy small { font-size: 9px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-clock-group .date-line { font-size: 9px; gap: 4px; white-space: nowrap; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-clock-group .date-line svg { height: 14px; width: 14px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-clock-group .clock { font-size: 28px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-header-actions { gap: 6px; }
+  .app-shell:not(.android-app):not(.tv-mode) .site-header-actions .cache-reset-button,
+  .app-shell:not(.android-app):not(.tv-mode) .site-header-actions .tv-mode-button { font-size: 9px; gap: 5px; padding: 0 8px; }
+  .app-shell:not(.android-app):not(.tv-mode) .website-app-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .app-shell:not(.android-app):not(.tv-mode) .website-app-options-grid { grid-template-columns: minmax(0, 1fr); }
+  .app-shell:not(.android-app):not(.tv-mode) .panel { padding: 17px 14px; }
+  .app-shell:not(.android-app):not(.tv-mode) .weather-header-actions { align-self: stretch; flex-wrap: wrap; }
+}

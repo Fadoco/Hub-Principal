@@ -109,6 +109,68 @@ test('does not show the generic useful sites section on the public website', asy
   await expect(page.getByText('Remover fundo')).toHaveCount(0)
 })
 
+test('uses saved favorite cities and metric settings on the public website', async ({ page }) => {
+  await page.evaluate(() => {
+    localStorage.setItem('hub-favorite-locations', JSON.stringify([
+      { city: 'Jundiaí', state: 'São Paulo', country: 'Brasil', latitude: -23.1896, longitude: -46.8978 },
+    ]))
+  })
+  await page.goto('/')
+
+  const favoriteCity = page.getByRole('button', { name: /Jundiaí/ })
+  await expect(favoriteCity).toBeVisible()
+  await favoriteCity.click()
+  await expect(page.locator('.location-line > span').first()).toHaveText('Jundiaí, SP')
+
+  await page.locator('.site-metric-picker > summary').click()
+  const visibilityMetric = page.getByRole('checkbox', { name: 'Visibilidade' })
+  await expect(visibilityMetric).toBeChecked()
+  await visibilityMetric.uncheck()
+  await expect(visibilityMetric).not.toBeChecked()
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hub-site-weather-metrics') || '[]')))
+    .not.toContain('visibility')
+
+  const metricPicker = page.locator('.site-metric-picker')
+  await expect(metricPicker).toHaveJSProperty('open', true)
+  await page.locator('.site-brand').click()
+  await expect(metricPicker).toHaveJSProperty('open', false)
+
+  const themePicker = page.locator('.site-theme-picker')
+  await themePicker.locator('summary').click()
+  await page.getByRole('radio', { name: /Claro/ }).check()
+  await expect(page.locator('main')).toHaveClass(/site-theme-light/)
+  expect(await page.evaluate(() => localStorage.getItem('hub-site-theme'))).toBe('light')
+  await page.getByRole('radio', { name: /Escuro/ }).check()
+  const darkColors = await page.evaluate(() => ({
+    body: getComputedStyle(document.body).backgroundColor,
+    page: getComputedStyle(document.querySelector('main')!).backgroundColor,
+    panel: getComputedStyle(document.querySelector('.weather-panel')!).backgroundColor,
+  }))
+  expect(darkColors.body).toBe('rgb(0, 0, 0)')
+  expect(darkColors.page).toBe('rgb(0, 0, 0)')
+  expect(darkColors.panel).toBe('rgb(8, 8, 8)')
+  await page.getByRole('radio', { name: /Claro/ }).check()
+  await page.locator('.site-brand').click()
+  await expect(themePicker).toHaveJSProperty('open', false)
+  await page.reload()
+  await expect(page.locator('main')).toHaveClass(/site-theme-light/)
+
+  const appOptions = page.locator('#website-app-options-panel')
+  const appOptionsTrigger = page.locator('.website-app-trigger')
+  await expect(appOptions).toBeHidden()
+  await appOptionsTrigger.click()
+  await expect(appOptions).toBeVisible()
+  await expect(appOptionsTrigger).toHaveAttribute('aria-expanded', 'true')
+  const androidDownload = page.getByRole('link', { name: 'Baixar para Android' })
+  await expect(androidDownload).toHaveAttribute('href', 'https://fadoco.github.io/Hub-Principal/updates/Hub-Principal.apk')
+  await appOptionsTrigger.click()
+  await expect(appOptions).toBeHidden()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await expect(page.locator('.site-brand h1')).toBeVisible()
+})
+
 test('keeps weather and satellite visible and hides news in website TV mode', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Modo TV' }).click()

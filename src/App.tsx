@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from 'react'
-import { Activity, AlertCircle, CalendarDays, ChevronLeft, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, GripVertical, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, RotateCcw, Settings2, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
+import { Activity, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, GripVertical, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, RotateCcw, Settings2, Smartphone, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import './App.css'
+import './styles/App.css'
 import { handleExternalLink } from './openExternalUrl'
 import { setAndroidTvMode } from './androidTvMode'
 import { readPersistentCache, writePersistentCache } from './persistentCache'
@@ -32,6 +32,7 @@ type PersonalSite = { name: string; url: string }
 type WeatherMetricId = 'humidity' | 'wind' | 'pressure' | 'precipitation' | 'visibility' | 'sunrise' | 'sunset' | 'uv' | 'clouds'
 type NewsCategoryId = 'local' | 'games' | 'films' | 'anime' | 'geek' | 'global'
 type MobileTheme = 'original' | 'dark' | 'light'
+type SiteTheme = 'original' | 'dark' | 'light'
 type MobilePreferences = {
   rainAlerts: boolean
   visibleMetrics: WeatherMetricId[]
@@ -49,6 +50,9 @@ const SatellitePanel = lazy(() => import('./SatellitePanel'))
 const FAVORITE_LOCATIONS_KEY = 'hub-favorite-locations'
 const PERSONAL_SITES_KEY = 'hub-personal-sites'
 const MOBILE_PREFERENCES_KEY = 'hub-mobile-preferences'
+const SITE_WEATHER_METRICS_KEY = 'hub-site-weather-metrics'
+const SITE_THEME_KEY = 'hub-site-theme'
+const ANDROID_DOWNLOAD_URL = 'https://fadoco.github.io/Hub-Principal/updates/Hub-Principal.apk'
 const weatherMetricOptions: Array<{ id: WeatherMetricId; label: string }> = [
   { id: 'humidity', label: 'Umidade' },
   { id: 'wind', label: 'Vento' },
@@ -61,6 +65,28 @@ const weatherMetricOptions: Array<{ id: WeatherMetricId; label: string }> = [
   { id: 'clouds', label: 'Nuvens' },
 ]
 const defaultMetricOrder = weatherMetricOptions.map(({ id }) => id)
+const readSiteWeatherMetrics = (): WeatherMetricId[] => {
+  try {
+    const saved = localStorage.getItem(SITE_WEATHER_METRICS_KEY)
+    if (!saved) return [...defaultMetricOrder]
+    const parsed: unknown = JSON.parse(saved)
+    if (!Array.isArray(parsed) || !parsed.every((id) => typeof id === 'string' && defaultMetricOrder.includes(id as WeatherMetricId))) {
+      return [...defaultMetricOrder]
+    }
+    const visible = defaultMetricOrder.filter((id) => parsed.includes(id))
+    return visible.length ? visible : [...defaultMetricOrder]
+  } catch {
+    return [...defaultMetricOrder]
+  }
+}
+const readSiteTheme = (): SiteTheme => {
+  try {
+    const saved = localStorage.getItem(SITE_THEME_KEY)
+    return saved === 'dark' || saved === 'light' ? saved : 'original'
+  } catch {
+    return 'original'
+  }
+}
 const newsCategoryOptions: Array<{ id: NewsCategoryId; label: string }> = [
   { id: 'local', label: 'Notícias locais' },
   { id: 'games', label: 'Jogos' },
@@ -469,9 +495,9 @@ function InstallApp() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  if (!prompt) return null
+  if (!prompt) return <span className="install-hint">Instalação pelo navegador</span>
 
-  return <button className="install-button" type="button" onClick={async () => { await prompt.prompt(); setPrompt(null) }}><Download size={15} /> Instalar app</button>
+  return <button className="install-button" type="button" onClick={async () => { await prompt.prompt(); setPrompt(null) }}><Download size={15} /> Instalar no PC</button>
 }
 
 function LiveClock() {
@@ -509,6 +535,13 @@ function App() {
   const [isResettingSite, setIsResettingSite] = useState(false)
   const [siteResetError, setSiteResetError] = useState('')
   const [favoriteLocations, setFavoriteLocations] = useState<FavoriteLocationsState>(readFavoriteLocations)
+  const [siteVisibleMetrics, setSiteVisibleMetrics] = useState(readSiteWeatherMetrics)
+  const [siteMetricError, setSiteMetricError] = useState('')
+  const [siteTheme, setSiteTheme] = useState<SiteTheme>(readSiteTheme)
+  const [siteThemeError, setSiteThemeError] = useState('')
+  const [isWebsiteAppsOpen, setIsWebsiteAppsOpen] = useState(false)
+  const siteMetricPickerRef = useRef<HTMLDetailsElement>(null)
+  const siteThemePickerRef = useRef<HTMLDetailsElement>(null)
   const [mobilePreferenceState, setMobilePreferenceState] = useState(readMobilePreferences)
   const [draggedMetric, setDraggedMetric] = useState<WeatherMetricId | null>(null)
   const mobilePreferencesRef = useRef(mobilePreferenceState.value)
@@ -553,6 +586,30 @@ function App() {
     return () => {
       window.removeEventListener('online', updateOnlineStatus)
       window.removeEventListener('offline', updateOnlineStatus)
+    }
+  }, [])
+
+  useEffect(() => {
+    const disclosures = [siteMetricPickerRef, siteThemePickerRef]
+    const closeWhenOutside = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      disclosures.forEach((disclosure) => {
+        const element = disclosure.current
+        if (element?.open && !element.contains(target)) element.open = false
+      })
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      disclosures.forEach((disclosure) => {
+        if (disclosure.current?.open) disclosure.current.open = false
+      })
+    }
+    document.addEventListener('pointerdown', closeWhenOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeWhenOutside)
+      document.removeEventListener('keydown', closeOnEscape)
     }
   }, [])
 
@@ -694,6 +751,28 @@ function App() {
       ? mobilePreferences.visibleMetrics.filter((item) => item !== metric)
       : [...mobilePreferences.visibleMetrics, metric]
     updateMobilePreferences({ visibleMetrics })
+  }
+
+  const setSiteMetricVisibility = (metric: WeatherMetricId, visible: boolean) => {
+    const next = defaultMetricOrder.filter((id) => id === metric ? visible : siteVisibleMetrics.includes(id))
+    if (!next.length) return
+    try {
+      localStorage.setItem(SITE_WEATHER_METRICS_KEY, JSON.stringify(next))
+      setSiteVisibleMetrics(next)
+      setSiteMetricError('')
+    } catch {
+      setSiteMetricError('Não foi possível salvar as métricas neste navegador.')
+    }
+  }
+
+  const updateSiteTheme = (theme: SiteTheme) => {
+    try {
+      localStorage.setItem(SITE_THEME_KEY, theme)
+      setSiteTheme(theme)
+      setSiteThemeError('')
+    } catch {
+      setSiteThemeError('Não foi possível salvar o tema neste navegador.')
+    }
   }
 
   const startDraggingWeatherMetric = (metric: WeatherMetricId, event: PointerEvent<HTMLButtonElement>) => {
@@ -1102,7 +1181,7 @@ function App() {
   }
   const visibleWeatherMetrics = isAndroidApplication
     ? mobilePreferences.metricOrder.filter((id) => mobilePreferences.visibleMetrics.includes(id))
-    : defaultMetricOrder
+    : siteVisibleMetrics
   const daily = weather?.daily.time.slice(0, 5) || []
   const dateText = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(now)
   const isUsingCustomLocation = currentLocation && location ? (Math.abs(location.latitude - currentLocation.latitude) > 0.01 || Math.abs(location.longitude - currentLocation.longitude) > 0.01) : false
@@ -1155,7 +1234,7 @@ function App() {
 
   return (
     <main
-      className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ` android-app theme-${mobilePreferences.theme}` : ''}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}`}
+      className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ` android-app theme-${mobilePreferences.theme}` : ` site-theme-${siteTheme}`}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}`}
       translate="no"
       onScroll={isAndroidApplication ? (event) => {
         const scrollTop = event.currentTarget.scrollTop
@@ -1186,30 +1265,99 @@ function App() {
         <header className="hero-header">
           {isAndroidApplication ? androidHeaderContent : (
             <>
-        {!isAndroidApplication && (
-          <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
-            <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
-            <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
-          </button>
-        )}
-        <button
-          className="tv-mode-button"
-          type="button"
-          onClick={() => setIsTvMode((enabled) => !enabled)}
-          aria-pressed={isTvMode}
-        >
-          {isTvMode ? <X size={16} /> : <Monitor size={16} />}
-          {isTvMode ? 'Sair do modo TV' : 'Modo TV'}
-        </button>
-        <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
-        <LiveClock />
-        <p className="timezone">Horário local do seu dispositivo</p>
-        <p className="auto-refresh-note">Atualização automática a cada 30 minutos</p>
-        <InstallApp />
-        {!isAndroidApplication && siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
+              <div className="site-header-main">
+                <div className="site-brand">
+                  <span className="site-brand-icon"><CloudSun size={23} /></span>
+                  <span className="site-brand-copy">
+                    <h1>Hub Principal</h1>
+                    <small>Clima, satélite e cotações</small>
+                  </span>
+                </div>
+                <div className="site-clock-group">
+                  <div className="date-line"><CalendarDays size={16} /> {dateText}</div>
+                  <LiveClock />
+                  <p className="timezone">Horário local do seu dispositivo</p>
+                </div>
+                <div className="site-header-actions">
+                  <details className="site-theme-picker" ref={siteThemePickerRef}>
+                    <summary aria-label={`Tema do site: ${siteTheme === 'original' ? 'ciano original' : siteTheme === 'dark' ? 'escuro' : 'claro'}`}>
+                      <Settings2 size={15} />
+                      <span>Tema</span>
+                    </summary>
+                    <fieldset className="site-theme-options">
+                      <legend>Modo de cor</legend>
+                      <label><input type="radio" name="site-theme" checked={siteTheme === 'original'} onChange={() => updateSiteTheme('original')} /><span className="site-theme-swatch swatch-original" />Ciano original</label>
+                      <label><input type="radio" name="site-theme" checked={siteTheme === 'dark'} onChange={() => updateSiteTheme('dark')} /><span className="site-theme-swatch swatch-dark" />Escuro</label>
+                      <label><input type="radio" name="site-theme" checked={siteTheme === 'light'} onChange={() => updateSiteTheme('light')} /><span className="site-theme-swatch swatch-light" />Claro</label>
+                      {siteThemeError && <p role="alert">{siteThemeError}</p>}
+                    </fieldset>
+                  </details>
+                  <button
+                    className="tv-mode-button"
+                    type="button"
+                    onClick={() => setIsTvMode((enabled) => !enabled)}
+                    aria-pressed={isTvMode}
+                  >
+                    {isTvMode ? <X size={16} /> : <Monitor size={16} />}
+                    {isTvMode ? 'Sair do modo TV' : 'Modo TV'}
+                  </button>
+                  <button className="cache-reset-button" type="button" onClick={resetSiteData} disabled={isResettingSite}>
+                    <RefreshCw size={16} className={isResettingSite ? 'spin' : ''} />
+                    <span>{isResettingSite ? 'Limpando dados...' : 'Limpar dados e atualizar'}</span>
+                  </button>
+                </div>
+              </div>
+              <p className="auto-refresh-note">Atualização automática a cada 30 minutos</p>
+              {siteResetError && <p className="site-reset-error" role="alert">{siteResetError}</p>}
             </>
           )}
         </header>
+      )}
+
+      {!isAndroidApplication && !isTvMode && (
+        <section className="website-app-options" aria-label="Aplicativos do Hub Principal">
+          <button
+            className="website-app-trigger"
+            type="button"
+            aria-expanded={isWebsiteAppsOpen}
+            aria-controls="website-app-options-panel"
+            onClick={() => setIsWebsiteAppsOpen((open) => !open)}
+          >
+            <span className="website-app-trigger-copy">
+              <span className="section-kicker">VERSÕES DO HUB</span>
+              <strong>Instalar ou baixar o aplicativo</strong>
+            </span>
+            <span className="website-app-trigger-action">
+              {isWebsiteAppsOpen ? 'Ocultar opções' : 'PC e Android'}
+              <ChevronDown className={isWebsiteAppsOpen ? 'is-open' : ''} size={17} />
+            </span>
+          </button>
+          <div id="website-app-options-panel" className="website-app-options-content" hidden={!isWebsiteAppsOpen}>
+            <div className="website-app-heading">
+              <p>Escolha a versão para seu dispositivo.</p>
+            </div>
+            <div className="website-app-options-grid">
+              <article className="website-app-option">
+                <span className="website-app-option-icon"><Monitor size={20} /></span>
+                <div className="website-app-option-copy">
+                  <h3>Para computador</h3>
+                  <p>Instale pelo navegador compatível ou use o site no computador.</p>
+                  <InstallApp />
+                </div>
+              </article>
+              <article className="website-app-option">
+                <span className="website-app-option-icon android-option-icon"><Smartphone size={20} /></span>
+                <div className="website-app-option-copy">
+                  <h3>Para Android</h3>
+                  <p>Baixe o app Android oficial do Hub Principal.</p>
+                  <a className="android-download-button" href={ANDROID_DOWNLOAD_URL}>
+                    <Download size={15} /> Baixar para Android
+                  </a>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
       )}
 
       {(!isAndroidApplication || activeMobileTab === 'home' || isTvMode) && <section className="content-grid">
@@ -1220,6 +1368,29 @@ function App() {
               <h2>Clima agora</h2>
             </div>
             <div className="weather-header-actions">
+              {!isAndroidApplication && (
+                <details className="site-metric-picker" ref={siteMetricPickerRef}>
+                  <summary title="Configurar métricas do clima">
+                    <Settings2 size={15} />
+                    <span>Métricas</span>
+                  </summary>
+                  <fieldset className="site-metric-options">
+                    <legend>Dados exibidos</legend>
+                    {weatherMetricOptions.map(({ id, label }) => (
+                      <label key={id}>
+                        <input
+                          type="checkbox"
+                          checked={siteVisibleMetrics.includes(id)}
+                          disabled={siteVisibleMetrics.length === 1 && siteVisibleMetrics.includes(id)}
+                          onChange={(event) => setSiteMetricVisibility(id, event.target.checked)}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                    {siteMetricError && <p role="alert">{siteMetricError}</p>}
+                  </fieldset>
+                </details>
+              )}
               <button className="location-button" type="button" onClick={openLocationModal}>Ver clima em outro local</button>
               <button className="icon-button" title="Atualizar clima" onClick={() => location && loadWeather(location)} disabled={loadingWeather}>
                 <RefreshCw size={17} className={loadingWeather ? 'spin' : ''} />
@@ -1254,8 +1425,8 @@ function App() {
             <div className="notice"><LocateFixed size={16} /> {locationError || 'Solicitando sua localização...'}</div>
           )}
 
-          {isAndroidApplication && favoriteLocations.items.length > 0 && (
-            <div className="favorite-city-shortcuts" aria-label="Cidades favoritas">
+          {favoriteLocations.items.length > 0 && (
+            <div className={`favorite-city-shortcuts${isAndroidApplication ? '' : ' website-city-shortcuts'}`} aria-label="Cidades favoritas">
               {favoriteLocations.items.map((favorite) => {
                 const isSelected = Boolean(location && getLocationKey(favorite) === getLocationKey(location))
                 return (
