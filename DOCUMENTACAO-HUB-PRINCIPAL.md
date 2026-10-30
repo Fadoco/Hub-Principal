@@ -9,7 +9,6 @@ O Hub Principal é uma dashboard pessoal em React que reúne em uma única inter
 - imagens animadas do satélite meteorológico GOES do INMET;
 - cotações de moedas (Dólar e Euro em relação ao Real);
 - notícias por categoria;
-- links úteis para ferramentas e serviços;
 - suporte a instalação como app PWA.
 
 O projeto tem uma estética "cyberpunk"/"command center", com fundo escuro, elementos em azul e ciano, como se fosse um painel de monitoramento.
@@ -241,20 +240,8 @@ Funções relevantes:
 - `parseNewsFeed`: converte o RSS XML em notícias exibíveis
 - `sessionStorage`: mantém cache de notícias por categoria
 
-### 6.5 `UsefulSites`
-Lista sites úteis em cards com:
-
-- nome do serviço
-- breve descrição
-- link externo
-
-Exemplos presentes:
-- remover fundo de imagens
-- PDF tools
-- melhoria de imagem
-- ChatGPT
-- SAAEB
-- CPFL
+### 6.5 `PersonalSites`
+No app Android, o usuário pode cadastrar atalhos pessoais. Eles ficam salvos localmente no aparelho e podem ser removidos pelo próprio usuário. A seção genérica de sites úteis não faz parte da página web pública.
 
 ### 6.6 `InstallApp`
 É um componente que observa o evento `beforeinstallprompt`, que é disparado quando o navegador aceita a instalação de um PWA.
@@ -297,7 +284,7 @@ Isso faz duas coisas:
 
 Esse padrão é usado em:
 - links de notícias;
-- sites úteis;
+- atalhos pessoais do app;
 - botões de fontes externas.
 
 ---

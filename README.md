@@ -17,7 +17,7 @@ Clima, previsão do tempo, notícias e informações úteis em um só lugar. Use
 - **Clima e previsão:** condições atuais, próximas horas e previsão dos próximos dias, com chance e horário estimado do pico de chuva quando disponível.
 - **Satélite:** imagens meteorológicas recentes do INMET, com controles para animar e escolher os horários.
 - **Notícias:** manchetes organizadas por assuntos, com links para abrir as fontes.
-- **Cotações e atalhos:** valores de referência do dólar e do euro, além de links úteis.
+- **Cotações:** valores de referência do dólar e do euro.
 - **Modo TV:** visualização ampliada de clima e satélite para telas maiores.
 
 ## Como usar

@@ -90,14 +90,6 @@ const newsSearchQueries = {
   geek: ['notícias geek', 'cultura pop geek', 'notícias nerd', 'cultura nerd'],
   global: ['notícias mundo', 'notícias internacionais', 'notícias globais', 'notícias mundiais', 'mundo notícias', 'notícias exterior'],
 }
-const usefulSites = [
-  { label: 'Remover fundo', description: 'Remova fundos de imagens', url: 'https://www.photoroom.com/pt-br/tools/background-remover' },
-  { label: 'Gerenciador de PDF', description: 'Editar e organizar PDFs', url: 'https://www.ilovepdf.com/' },
-  { label: 'Melhorar qualidade', description: 'Aumente a qualidade da imagem', url: 'https://www.iloveimg.com/pt/ampliar-imagem' },
-  { label: 'ChatGPT', description: 'Assistente de inteligência artificial', url: 'https://chatgpt.com/' },
-  { label: 'SAAEB', description: 'Serviços de água e esgoto', url: 'https://saaeb.com.br/' },
-  { label: 'CPFL', description: 'Acesso e serviços CPFL', url: 'https://cpflb2cprd.b2clogin.com/cpflb2cprd.onmicrosoft.com/b2c_1a_signup_signin_mfa_front/oauth2/v2.0/authorize?p=B2C_1A_SIGNUP_SIGNIN_MFA_FRONT&client_id=17d5831d-6741-4670-8085-d1d34e37aec1&nonce=defaultNonce&redirect_uri=https%3A%2F%2Fwww.cpfl.com.br%2Fb2c-auth%2Freceive-token&scope=17d5831d-6741-4670-8085-d1d34e37aec1%20offline_access&response_type=code&prompt=login&response_mode=query' },
-]
 const mobileTabs = [
   { id: 'home', label: 'Início', icon: Home },
   { id: 'satellite', label: 'Satélite', icon: Radio },
@@ -287,10 +279,6 @@ const fetchCitySuggestions = async (query: string, signal?: AbortSignal): Promis
 
 function Metric({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: string; detail?: string; tone?: string }) {
   return <div className={`metric${tone ? ` metric-${tone}` : ''}`}><span className="metric-icon">{icon}</span><span><small>{label}</small><strong>{value}</strong>{detail && <em>{detail}</em>}</span></div>
-}
-
-function UsefulSites() {
-  return <section className="useful-sites"><div className="useful-heading"><div><span className="section-kicker">ATALHOS RÁPIDOS</span><h2>Sites úteis</h2></div><span className="useful-count">{usefulSites.length} serviços</span></div><div className="useful-grid">{usefulSites.map((site) => <a className="useful-card" href={site.url} target="_blank" rel="noreferrer" onClick={(event) => handleExternalLink(event, site.url)} key={site.url}><span><strong>{site.label}</strong><small>{site.description}</small></span><ExternalLink size={16} /></a>)}</div></section>
 }
 
 function readPersonalSites() {
@@ -1595,8 +1583,6 @@ function App() {
           </div>}
         </section>
       )}
-
-      {!isAndroidApplication && <UsefulSites />}
 
       {!isAndroidApplication && <footer>
         <strong>Hub Principal</strong>

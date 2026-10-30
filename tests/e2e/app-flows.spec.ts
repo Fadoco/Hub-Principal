@@ -79,6 +79,12 @@ test('starts with the weather panel and lazily loads the news tab', async ({ pag
     .some((resource) => resource.name.includes('/src/NewsPanel.tsx')))).toBe(true)
 })
 
+test('does not show the generic useful sites section on the public website', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Sites úteis' })).toHaveCount(0)
+  await expect(page.getByText('Remover fundo')).toHaveCount(0)
+})
+
 test('searches and selects a city from suggestions', async ({ page }) => {
   await page.getByRole('button', { name: 'Ver clima em outro local' }).click()
   const cityInput = page.getByRole('textbox', { name: 'Cidade' })
