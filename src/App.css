@@ -511,7 +511,6 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   position: sticky;
   text-align: left;
   top: 0;
-  transition: height .2s ease, padding .2s ease;
   width: calc(100% + 32px);
   z-index: 20;
 }

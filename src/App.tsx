@@ -494,7 +494,6 @@ function App() {
     ? mobileTabs.find(({ id }) => id === new URLSearchParams(window.location.search).get('androidPreviewTab'))?.id
     : undefined
   const [now, setNow] = useState(new Date())
-  const [isMobileHeaderCompact, setIsMobileHeaderCompact] = useState(false)
   const [activeMobileTab, setActiveMobileTab] = useState<(typeof mobileTabs)[number]['id']>(previewTab || 'home')
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [isPullRefreshing, setIsPullRefreshing] = useState(false)
@@ -532,6 +531,11 @@ function App() {
   const dismissedUpdateVersion = useRef<string | null>(null)
   const isAndroidApplication = isAndroidApp() || isAndroidPreview
   const mobilePreferences = mobilePreferenceState.value
+  const syncMobileHeaderCompact = useCallback((header: HTMLElement | null) => {
+    if (!header) return
+    const scrollContainer = header.closest('.android-app')
+    if (scrollContainer) header.classList.toggle('is-compact', scrollContainer.scrollTop > 32)
+  }, [])
   const localNewsCity = location?.city === 'Localização atual' ? null : location?.city || null
   const isCurrentLocationFavorite = Boolean(location && favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(location)))
   const isNewsCategoryVisible = (category: NewsCategoryId) =>
@@ -1153,7 +1157,10 @@ function App() {
       translate="no"
       onScroll={isAndroidApplication ? (event) => {
         const scrollTop = event.currentTarget.scrollTop
-        setIsMobileHeaderCompact((isCompact) => scrollTop > (isCompact ? 8 : 32))
+        const header = event.currentTarget.querySelector<HTMLElement>('.mobile-fixed-header')
+        if (!header) return
+        const isCompact = header.classList.contains('is-compact')
+        header.classList.toggle('is-compact', scrollTop > (isCompact ? 8 : 32))
       } : undefined}
       onTouchStart={isAndroidApplication ? (event) => {
         pullStartY.current = event.currentTarget.scrollTop <= 2 ? event.touches[0]?.clientY ?? null : null
@@ -1169,7 +1176,7 @@ function App() {
       onTouchCancel={() => { pullStartY.current = null }}
     >
       {isAndroidApplication && !isTvMode && (
-        <header className={`hero-header mobile-fixed-header theme-${mobilePreferences.theme}${isMobileHeaderCompact ? ' is-compact' : ''}`}>
+        <header ref={syncMobileHeaderCompact} className={`hero-header mobile-fixed-header theme-${mobilePreferences.theme}`}>
           {androidHeaderContent}
         </header>
       )}
