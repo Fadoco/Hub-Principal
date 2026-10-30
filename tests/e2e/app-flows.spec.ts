@@ -100,10 +100,19 @@ test('keeps weather and satellite visible and hides news in website TV mode', as
 })
 
 test('adapts Android TV mode to a small portrait screen without clipping panels', async ({ page }) => {
+  const allMetrics = ['humidity', 'wind', 'pressure', 'precipitation', 'visibility', 'sunrise', 'sunset', 'uv', 'clouds']
   await page.evaluate(() => localStorage.setItem('hub-favorite-locations', JSON.stringify([
     { city: 'Miranorte', state: 'TO', country: 'Brasil', latitude: -8.61, longitude: -48.62 },
     { city: 'São Paulo', state: 'SP', country: 'Brasil', latitude: -23.55, longitude: -46.63 },
   ])))
+  await page.evaluate((metricOrder) => localStorage.setItem('hub-mobile-preferences', JSON.stringify({
+    rainAlerts: true,
+    visibleMetrics: metricOrder,
+    metricOrder,
+    newsCategories: [],
+    textSize: 'large',
+    theme: 'original',
+  })), allMetrics)
   await page.reload()
   await page.setViewportSize({ width: 320, height: 640 })
   await page.getByRole('button', { name: 'Mais' }).click()
@@ -149,6 +158,11 @@ test('adapts Android TV mode to a small portrait screen without clipping panels'
         clockRight: element.querySelector('.mobile-header-center .clock')!.getBoundingClientRect().right,
         exitLeft: element.querySelector('.mobile-tv-exit')!.getBoundingClientRect().left,
       },
+      visibleMetricCount: [...element.querySelectorAll('.metric')]
+        .filter((metric) => getComputedStyle(metric).display !== 'none').length,
+      storedMetricCount: JSON.parse(localStorage.getItem('hub-mobile-preferences') || '{}').visibleMetrics?.length,
+      connectivity: getComputedStyle(element.querySelector('.mobile-connectivity')!).display,
+      currentWeatherHeight: element.querySelector('.current-weather')!.getBoundingClientRect().height,
     }
   })
   expect(landscapeLayout.display).toBe('grid')
@@ -162,7 +176,12 @@ test('adapts Android TV mode to a small portrait screen without clipping panels'
   expect(landscapeLayout.currency.bottom).toBeLessThanOrEqual(landscapeLayout.weather.bottom)
   expect(landscapeLayout.header.dateRight).toBeLessThan(landscapeLayout.header.clockLeft)
   expect(landscapeLayout.header.clockRight).toBeLessThan(landscapeLayout.header.exitLeft)
+  expect(landscapeLayout.visibleMetricCount).toBe(3)
+  expect(landscapeLayout.storedMetricCount).toBe(9)
+  expect(landscapeLayout.connectivity).toBe('none')
+  expect(landscapeLayout.currentWeatherHeight).toBeLessThanOrEqual(64)
   await expect(page.locator('.favorite-city-shortcuts')).toBeHidden()
+  await expect(page.locator('.tv-weather-rain')).toContainText(/às \d{2}:\d{2}/)
 })
 
 test('searches and selects a city from suggestions', async ({ page }) => {

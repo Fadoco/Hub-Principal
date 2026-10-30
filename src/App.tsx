@@ -1304,7 +1304,9 @@ function App() {
 
               <div className="tv-weather-rain">
                 <CloudRain size={21} />
-                <span>Maior chance de chuva hoje</span>
+                <span>
+                  Maior chance de chuva hoje{highestRainChanceToday ? ` · às ${formatTime(highestRainChanceToday.time)}` : ''}
+                </span>
                 <strong>{formatNumber(highestRainChanceToday?.probability, '%')}</strong>
               </div>
               <div className="metric-grid">
