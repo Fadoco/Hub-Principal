@@ -1009,6 +1009,19 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 @media (orientation: landscape) and (max-height: 460px) {
   .android-app.tv-mode .metric:nth-child(n + 4) { display: none; }
 }
+@media (max-width: 420px) and (orientation: portrait) {
+  .android-app:not(.tv-mode) .current-weather {
+    display: grid; gap: 10px 12px; grid-template-areas: "icon current" "feels feels";
+    grid-template-columns: 56px minmax(0, 1fr); padding: 14px 12px;
+  }
+  .android-app:not(.tv-mode) .weather-symbol { grid-area: icon; }
+  .android-app:not(.tv-mode) .current-weather > div:nth-child(2) { grid-area: current; min-width: 0; }
+  .android-app:not(.tv-mode) .feels {
+    align-items: center; border-left: 0; border-top: 1px solid rgba(190, 208, 231, .17);
+    display: flex; gap: 8px; grid-area: feels; margin: 0; padding: 8px 0 0; width: auto;
+  }
+  .android-app:not(.tv-mode) .feels strong { margin-left: auto; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }

@@ -79,6 +79,30 @@ test('starts with the weather panel and lazily loads the news tab', async ({ pag
     .some((resource) => resource.name.includes('/src/NewsPanel.tsx')))).toBe(true)
 })
 
+test('keeps thermal sensation inside the weather card on small Android screens', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await page.evaluate(() => localStorage.setItem('hub-mobile-preferences', JSON.stringify({
+    rainAlerts: true,
+    visibleMetrics: ['humidity', 'wind', 'pressure', 'precipitation'],
+    metricOrder: ['humidity', 'wind', 'pressure', 'precipitation', 'visibility', 'sunrise', 'sunset', 'uv', 'clouds'],
+    newsCategories: [],
+    textSize: 'large',
+    theme: 'original',
+  })))
+  await page.reload()
+
+  const card = page.locator('.current-weather')
+  const bounds = await card.evaluate((element) => {
+    const cardRect = element.getBoundingClientRect()
+    const feelsRect = element.querySelector('.feels')!.getBoundingClientRect()
+    return { card: cardRect.toJSON(), feels: feelsRect.toJSON() }
+  })
+  expect(bounds.feels.left).toBeGreaterThanOrEqual(bounds.card.left)
+  expect(bounds.feels.right).toBeLessThanOrEqual(bounds.card.right)
+  expect(bounds.feels.top).toBeGreaterThan(bounds.card.top)
+  expect(bounds.feels.bottom).toBeLessThanOrEqual(bounds.card.bottom)
+})
+
 test('does not show the generic useful sites section on the public website', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Sites úteis' })).toHaveCount(0)
