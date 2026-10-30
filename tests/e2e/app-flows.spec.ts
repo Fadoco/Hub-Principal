@@ -274,6 +274,11 @@ test('adapts Android TV mode to a small portrait screen without clipping panels'
   expect(landscapeLayout.currentWeatherHeight).toBeLessThanOrEqual(64)
   await expect(page.locator('.favorite-city-shortcuts')).toBeHidden()
   await expect(page.locator('.tv-weather-rain')).toContainText(/às \d{2}:\d{2}/)
+  await expect(page.locator('.satellite-controls')).toBeHidden()
+  await expect(page.locator('.satellite-timeline')).toBeHidden()
+  await expect(page.locator('.satellite-attribution')).toBeHidden()
+  const compactSatelliteHeight = await page.locator('.satellite-viewer').evaluate((element) => element.getBoundingClientRect().height)
+  expect(compactSatelliteHeight).toBeGreaterThan(220)
 })
 
 test('searches and selects a city from suggestions', async ({ page }) => {
