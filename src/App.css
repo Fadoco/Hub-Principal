@@ -941,22 +941,35 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 @media (orientation: landscape) and (max-height: 600px) {
   .android-app.tv-mode.app-shell {
     align-content: stretch; display: grid; flex-direction: initial; gap: 8px;
-    grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); grid-template-rows: 54px minmax(0, 1fr);
+    grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); grid-template-rows: 48px minmax(0, 1fr);
     height: 100dvh; overflow: hidden; padding: 6px 8px; width: 100%;
   }
   .android-app.tv-mode .hero-header {
-    grid-column: 1 / -1; grid-row: 1; justify-content: center; padding: 0 42px 4px 0;
+    grid-column: 1 / -1; grid-row: 1; justify-content: center; padding: 0 42px 0 0;
   }
-  .android-app.tv-mode .mobile-app-header { flex-direction: row; justify-content: center; min-height: 0; padding: 0; }
-  .android-app.tv-mode .mobile-header-center { flex-direction: row; gap: 10px; }
-  .android-app.tv-mode .mobile-tv-exit { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+  .android-app.tv-mode .mobile-app-header { flex-direction: row; justify-content: flex-start; min-height: 0; padding: 0; }
+  .android-app.tv-mode .mobile-header-center {
+    display: grid; flex: 1; gap: 8px; grid-template-columns: minmax(0, 1fr) auto;
+    min-width: 0; padding-right: 42px; text-align: left; width: 100%;
+  }
+  .android-app.tv-mode .mobile-date {
+    font-size: clamp(9px, 1.25vw, 11px); justify-content: flex-start;
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .android-app.tv-mode .clock { font-size: clamp(22px, 6vh, 28px); grid-column: 2; }
+  .android-app.tv-mode .mobile-tv-exit {
+    align-items: center; height: 34px; justify-content: center; min-height: 34px;
+    padding: 0; position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 34px;
+  }
+  .android-app.tv-mode .mobile-tv-exit span { display: none; }
+  .android-app.tv-mode .favorite-city-shortcuts { display: none; }
   .android-app.tv-mode .weather-panel {
-    grid-column: 1; grid-row: 2; height: 100%; min-height: 0; overflow-y: auto; padding: 6px 10px;
+    grid-column: 1; grid-row: 2; height: 100%; min-height: 0; overflow-y: auto; padding: 4px 10px;
   }
   .android-app.tv-mode .weather-panel > .section-heading { margin-bottom: 2px; }
   .android-app.tv-mode .weather-updated { display: none; }
   .android-app.tv-mode .location-line { margin-bottom: 4px; }
-  .android-app.tv-mode .current-weather { gap: 8px; margin-bottom: 4px; min-height: 0; padding: 4px 8px; }
+  .android-app.tv-mode .current-weather { gap: 8px; margin-bottom: 4px; min-height: 0; padding: 2px 8px; }
   .android-app.tv-mode .weather-symbol { height: 40px; width: 40px; }
   .android-app.tv-mode .temperature { font-size: clamp(32px, 7vh, 36px); }
   .android-app.tv-mode .tv-weather-rain { font-size: 9px; margin-bottom: 4px; padding: 3px 6px; }
