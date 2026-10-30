@@ -173,8 +173,11 @@ test('uses saved favorite cities and metric settings on the public website', asy
 
 test('keeps weather and satellite visible and hides news in website TV mode', async ({ page }) => {
   await page.goto('/')
+  const themePicker = page.locator('.site-theme-picker')
+  await expect(themePicker).toBeVisible()
   await page.getByRole('button', { name: 'Modo TV' }).click()
 
+  await expect(themePicker).toBeHidden()
   await expect(page.locator('.weather-panel')).toBeVisible()
   await expect(page.locator('.satellite-panel')).toBeVisible()
   await expect(page.locator('.news-portals')).toBeHidden()
@@ -183,6 +186,9 @@ test('keeps weather and satellite visible and hides news in website TV mode', as
   const satelliteHeight = await page.locator('.satellite-panel').evaluate((element) => element.getBoundingClientRect().height)
   expect(weatherHeight).toBeGreaterThan(200)
   expect(satelliteHeight).toBeGreaterThan(200)
+
+  await page.getByRole('button', { name: 'Sair do modo TV' }).click()
+  await expect(themePicker).toBeVisible()
 })
 
 test('adapts Android TV mode to a small portrait screen without clipping panels', async ({ page }) => {

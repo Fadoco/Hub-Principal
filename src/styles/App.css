@@ -1133,6 +1133,7 @@ body:has(.app-shell.site-theme-dark:not(.android-app)) { background: #000; }
 .tv-mode .site-clock-group,
 .tv-mode .site-header-actions { display: contents; }
 .tv-mode .site-brand { display: none; }
+.tv-mode .site-theme-picker { display: none; }
 .app-shell:not(.android-app):not(.tv-mode) .content-grid {
   gap: 20px; grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr); margin-top: 24px;
 }
