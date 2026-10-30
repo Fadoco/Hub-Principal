@@ -124,9 +124,31 @@ test('adapts Android TV mode to a small portrait screen without clipping panels'
   expect(satelliteViewerHeight).toBeGreaterThanOrEqual(180)
   expect(satelliteViewerHeight).toBeLessThanOrEqual(300)
 
+  await app.evaluate((element) => { element.scrollTop = 0 })
   await page.setViewportSize({ width: 844, height: 390 })
-  expect(await app.evaluate((element) => getComputedStyle(element).display)).toBe('flex')
-  expect(await app.evaluate((element) => element.scrollHeight)).toBeGreaterThan(await app.evaluate((element) => element.clientHeight))
+  const landscapeLayout = await app.evaluate((element) => {
+    const weather = element.querySelector('.weather-panel')!.getBoundingClientRect()
+    const satellite = element.querySelector('.satellite-panel')!.getBoundingClientRect()
+    const currency = element.querySelector('.currency-panel')!.getBoundingClientRect()
+    return {
+      display: getComputedStyle(element).display,
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      weather: { left: weather.left, top: weather.top, right: weather.right, bottom: weather.bottom },
+      satellite: { left: satellite.left, top: satellite.top },
+      currency: { left: currency.left, right: currency.right, top: currency.top, bottom: currency.bottom },
+    }
+  })
+  expect(landscapeLayout.display).toBe('grid')
+  expect(landscapeLayout.overflowY).toBe('hidden')
+  expect(landscapeLayout.scrollHeight).toBeLessThanOrEqual(landscapeLayout.clientHeight)
+  expect(landscapeLayout.satellite.left).toBeGreaterThan(landscapeLayout.weather.right)
+  expect(Math.abs(landscapeLayout.satellite.top - landscapeLayout.weather.top)).toBeLessThan(2)
+  expect(landscapeLayout.currency.left).toBeGreaterThanOrEqual(landscapeLayout.weather.left)
+  expect(landscapeLayout.currency.right).toBeLessThanOrEqual(landscapeLayout.weather.right)
+  expect(landscapeLayout.currency.top).toBeGreaterThan(landscapeLayout.weather.top)
+  expect(landscapeLayout.currency.bottom).toBeLessThanOrEqual(landscapeLayout.weather.bottom)
 })
 
 test('searches and selects a city from suggestions', async ({ page }) => {
