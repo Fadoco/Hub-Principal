@@ -69,6 +69,18 @@ export default {
       return jsonResponse({ error: 'A news query between 1 and 160 characters is required.' }, 400, headers)
     }
 
+    const clientIp = request.headers.get('CF-Connecting-IP')
+    if (!clientIp) {
+      console.error('Cloudflare did not provide a client IP for news rate limiting.')
+      return jsonResponse({ error: 'Unable to verify request source.' }, 503, headers)
+    }
+
+    const { success } = await env.NEWS_RATE_LIMITER.limit({ key: clientIp })
+    if (!success) {
+      headers.set('Retry-After', '60')
+      return jsonResponse({ error: 'Too many requests. Please retry in one minute.' }, 429, headers)
+    }
+
     const requestedMarket = requestUrl.searchParams.get('mkt') || 'pt-BR'
     if (!['pt-BR', 'en-US'].includes(requestedMarket)) {
       return jsonResponse({ error: 'Unsupported news market.' }, 400, headers)

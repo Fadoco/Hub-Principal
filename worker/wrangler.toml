@@ -5,3 +5,9 @@ workers_dev = true
 
 [vars]
 ALLOWED_ORIGINS = "https://fadoco.github.io,https://localhost,capacitor://localhost,http://localhost:5173,http://127.0.0.1:5173"
+
+[[unsafe.bindings]]
+name = "NEWS_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }

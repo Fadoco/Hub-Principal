@@ -55,7 +55,7 @@ Abra `http://127.0.0.1:5173/`.
 
 ## Notícias no Hub
 
-O frontend do GitHub Pages não consegue ler feeds de notícias diretamente por causa de CORS. O projeto inclui um Cloudflare Worker que busca o RSS de notícias do Bing, limita a origem e a consulta, e mantém cache por cinco minutos. Os links de busca dos cartões continuam abrindo o Google Notícias.
+O frontend do GitHub Pages não consegue ler feeds de notícias diretamente por causa de CORS. O projeto inclui um Cloudflare Worker que busca o RSS de notícias do Bing, valida a origem e a consulta, limita cada IP a 120 requisições por minuto e mantém cache por cinco minutos. O limite é uma proteção básica contra abuso, não substitui as proteções anti-DDoS da Cloudflare. CORS controla quais páginas podem ler a resposta no navegador; não autentica clientes nem impede chamadas automatizadas. Os links de busca dos cartões continuam abrindo o Google Notícias.
 
 1. Crie uma conta Cloudflare e autentique o Wrangler:
 
@@ -83,7 +83,15 @@ O frontend do GitHub Pages não consegue ler feeds de notícias diretamente por 
    npm run build:pages
    ```
 
-O app já usa por padrão a API pública do projeto para exibir manchetes; essa configuração só é necessária para substituir o endpoint. Para um domínio próprio, adicione a origem do site em `ALLOWED_ORIGINS` no [worker/wrangler.toml](./worker/wrangler.toml) e publique o Worker novamente.
+O app já usa por padrão a API pública do projeto para exibir manchetes; essa configuração só é necessária para substituir o endpoint. Endpoints personalizados de clima e notícias precisam usar HTTPS e são incluídos automaticamente na política CSP do build. Para um domínio próprio, adicione a origem do site em `ALLOWED_ORIGINS` no [worker/wrangler.toml](./worker/wrangler.toml) e publique o Worker novamente.
+
+## Segurança
+
+- O build de produção aplica uma Content Security Policy (CSP) que restringe scripts, frames e conexões aos serviços usados pelo app. Se adicionar uma integração externa, inclua apenas a origem necessária na política em `vite.config.ts`.
+- O Android bloqueia tráfego HTTP sem criptografia. APIs e serviços usados pelo app devem estar disponíveis por HTTPS.
+- O Worker limita requisições por IP, valida parâmetros e restringe origens de navegador. Essas medidas reduzem abuso, mas o endpoint continua público e não deve receber segredos.
+- GitHub Pages não permite configurar cabeçalhos HTTP de segurança personalizados neste projeto. A CSP é entregue como meta tag e não substitui cabeçalhos como HSTS ou `frame-ancestors`; para WAF e controle completo de cabeçalhos, publique atrás de um proxy/CDN com domínio próprio.
+- Nenhuma chave privada deve ser colocada no frontend, em variáveis `VITE_*` ou no APK. Tudo que é distribuído ao navegador ou empacotado no app pode ser extraído.
 
 ## Publicação no GitHub Pages
 
