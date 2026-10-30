@@ -9,7 +9,7 @@ type CachedFrame = SatelliteFrame & { date: string }
 
 const API_URL = 'https://apisat.inmet.gov.br'
 const PARAMETER = 'TN'
-const FRAME_CACHE_LIMIT = 12
+const FRAME_CACHE_LIMIT = 6
 const ANIMATION_INTERVAL = 900
 
 async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
@@ -282,6 +282,8 @@ export default function SatellitePanel() {
             className="satellite-image"
             src={frame.base64}
             alt={`Imagem de topo das nuvens sobre o Brasil, registrada às ${frame.hora}.`}
+            decoding="async"
+            fetchPriority="low"
           />
         )}
         {error && <span className="satellite-error-indicator" role="alert">{error}</span>}

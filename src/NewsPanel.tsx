@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Newspaper, RefreshCw } from 'lucide-react'
 import { handleExternalLink } from './openExternalUrl'
+import { readPersistentCache, writePersistentCache } from './persistentCache'
 
 type NewsItem = { title: string; link: string; pubDate: string; author?: string }
 type NewsPanelProps = { locationCity: string | null; locationState?: string | null; title: string; query: string | string[]; local?: boolean }
 const NEWS_CACHE_TTL = 300000
+const NEWS_OFFLINE_CACHE_TTL = 24 * 60 * 60 * 1000
 const NEWS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
 const NEWS_FUTURE_TOLERANCE_MS = 60 * 60 * 1000
 const NEWS_ITEMS_LIMIT = 7
@@ -77,6 +79,7 @@ export default function NewsPanel({ locationCity, locationState, title, query, l
   const [items, setItems] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+  const [isShowingCachedNews, setIsShowingCachedNews] = useState(false)
   const [isNearViewport, setIsNearViewport] = useState(false)
   const [retryToken, setRetryToken] = useState(0)
   const forceRefreshRef = useRef(false)
@@ -126,21 +129,39 @@ export default function NewsPanel({ locationCity, locationState, title, query, l
 
     const loadNews = async () => {
       if (activeController) return
-      if (!forceRefresh) {
-        try {
-          const cached = sessionStorage.getItem(cacheKey)
-          if (cached) {
-            const saved = JSON.parse(cached) as { timestamp: number; items: NewsItem[] }
-            const cachedItems = normalizeNewsItems(saved.items)
-            if (Date.now() - saved.timestamp < NEWS_CACHE_TTL && cachedItems.length === NEWS_ITEMS_LIMIT) {
-              setItems(cachedItems)
-              setError(false)
-              return
-            }
+      let cachedEntry: { timestamp: number; items: NewsItem[] } | null = null
+      try {
+        const persistent = readPersistentCache<{ items: NewsItem[] }>(cacheKey)
+        const legacy = persistent ? null : sessionStorage.getItem(cacheKey)
+        if (persistent && Array.isArray(persistent.value.items)) {
+          cachedEntry = { timestamp: persistent.timestamp, items: normalizeNewsItems(persistent.value.items) }
+        } else if (legacy) {
+          const saved: unknown = JSON.parse(legacy)
+          if (saved && typeof saved === 'object' && 'timestamp' in saved && 'items' in saved &&
+              typeof saved.timestamp === 'number' && Number.isFinite(saved.timestamp) && Array.isArray(saved.items)) {
+            cachedEntry = { timestamp: saved.timestamp, items: normalizeNewsItems(saved.items as NewsItem[]) }
           }
-        } catch (storageError) {
-          console.warn('Não foi possível ler o cache de notícias desta sessão.', storageError)
         }
+
+        if (cachedEntry && Date.now() - cachedEntry.timestamp > NEWS_OFFLINE_CACHE_TTL) cachedEntry = null
+        if (cachedEntry?.items.length) {
+          setItems(cachedEntry.items)
+          setIsShowingCachedNews(!navigator.onLine || Date.now() - cachedEntry.timestamp >= NEWS_CACHE_TTL)
+        }
+        if (!forceRefresh && cachedEntry && Date.now() - cachedEntry.timestamp < NEWS_CACHE_TTL &&
+            cachedEntry.items.length === NEWS_ITEMS_LIMIT) {
+          setIsShowingCachedNews(!navigator.onLine)
+          setError(false)
+          return
+        }
+      } catch (storageError) {
+        console.warn('Não foi possível ler o cache de notícias desta sessão.', storageError)
+      }
+
+      if (!navigator.onLine) {
+        setError(!cachedEntry?.items.length)
+        setLoading(false)
+        return
       }
 
       const controller = new AbortController()
@@ -176,11 +197,12 @@ export default function NewsPanel({ locationCity, locationState, title, query, l
 
         const nextItems = normalizeNewsItems(collectedItems)
         if (!cancelled) {
-          setItems(nextItems)
-          setError(successfulQueries === 0)
+          if (successfulQueries > 0 || !cachedEntry) setItems(nextItems)
+          setError(successfulQueries === 0 && !cachedEntry?.items.length)
+          setIsShowingCachedNews(successfulQueries === 0 && Boolean(cachedEntry?.items.length))
           if (successfulQueries > 0) {
             try {
-              sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: nextItems }))
+              writePersistentCache(cacheKey, { items: nextItems })
             } catch (storageError) {
               console.warn('Não foi possível salvar o cache de notícias desta sessão.', storageError)
             }
@@ -189,7 +211,8 @@ export default function NewsPanel({ locationCity, locationState, title, query, l
       } catch (loadError) {
         if (!cancelled && (timedOut || (loadError as Error).name !== 'AbortError')) {
           console.error('Não foi possível atualizar as notícias.', loadError)
-          setError(true)
+          setError(!cachedEntry?.items.length)
+          setIsShowingCachedNews(Boolean(cachedEntry?.items.length))
         }
       } finally {
         window.clearTimeout(timeout)
@@ -247,6 +270,9 @@ export default function NewsPanel({ locationCity, locationState, title, query, l
         <div className="news-info">As manchetes ainda não estão disponíveis neste painel. Use “Ver todas” para abrir as notícias atualizadas.</div>
       )}
       {error && <div className="news-error" role="status">Não foi possível atualizar as notícias. Tente novamente ou use “Ver todas”.</div>}
+      {isShowingCachedNews && items.length > 0 && (
+        <div className="news-cache-status" role="status">Exibindo notícias salvas · podem estar desatualizadas.</div>
+      )}
       {loading && !items.length ? (
         <div className="news-empty">Buscando notícias...</div>
       ) : error && !items.length ? (

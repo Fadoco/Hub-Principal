@@ -35,25 +35,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-          log-accepted-android-sdk-licenses: false
-          packages: platform-tools
-
-      - name: Install Android SDK packages
-        run: sdkmanager --install "platform-tools" "build-tools;36.0.0" "platforms;android-36"
-
-      - name: Install dependencies
-        run: npm ci
-
       - name: Identify Android and manual APK changes
         id: changes
         env:
@@ -71,11 +52,40 @@ jobs:
             echo "manual_apk=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if grep -Eq '^(\.github/workflows/publish-pages\.yml$|scripts/publish-android-update\.mjs$|apk/|src/|public/|index\.html$|package\.json$|package-lock\.json$|capacitor\.config\.)' <<< "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/publish-pages\.yml$|scripts/|apk/|src/|tests/|playwright\.config\.ts$|public/|index\.html$|package\.json$|package-lock\.json$|capacitor\.config\.)' <<< "$changed_files"; then
             echo "android_code=true" >> "$GITHUB_OUTPUT"
           else
             echo "android_code=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Validate Android release version
+        if: steps.changes.outputs.android_code == 'true' && steps.changes.outputs.manual_apk != 'true'
+        run: node scripts/check-android-release-version.mjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run automated tests
+        run: npm test
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: sdkmanager --install "platform-tools" "build-tools;36.0.0" "platforms;android-36"
 
       - name: Preserve published APK and manifest
         run: |

@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from 'react'
 import { Activity, AlertCircle, CalendarDays, ChevronLeft, Cloud, CloudDrizzle, CloudRain, CloudSun, Download, Droplets, Eye, ExternalLink, Gauge, GripVertical, Home, LocateFixed, MapPin, Monitor, MoreHorizontal, Navigation, Newspaper, Plus, Radio, RefreshCw, RotateCcw, Settings2, Star, Sun, Sunrise, Sunset, Trash2, Umbrella, Wind, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import './App.css'
-import CurrencyPanel from './CurrencyPanel'
-import NewsPanel from './NewsPanel'
 import { handleExternalLink } from './openExternalUrl'
-import SatellitePanel from './SatellitePanel'
 import { setAndroidTvMode } from './androidTvMode'
+import { readPersistentCache, writePersistentCache } from './persistentCache'
 import {
   checkForAndroidUpdate,
   downloadAndroidUpdate,
@@ -29,6 +27,7 @@ type CitySuggestion = {
   searchKey: string
 }
 type WeatherData = { current: Record<string, number | string>; hourly: { time: string[]; temperature_2m: number[]; precipitation: number[]; precipitation_probability: number[]; weather_code: number[] }; daily: { time: string[]; weather_code: number[]; precipitation_probability_max: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; sunrise: string[]; sunset: string[] } }
+type WeatherCache = { weather: WeatherData }
 type PersonalSite = { name: string; url: string }
 type WeatherMetricId = 'humidity' | 'wind' | 'pressure' | 'precipitation' | 'visibility' | 'sunrise' | 'sunset' | 'uv' | 'clouds'
 type NewsCategoryId = 'local' | 'games' | 'films' | 'anime' | 'geek' | 'global'
@@ -43,6 +42,10 @@ type MobilePreferences = {
 }
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const WEATHER_CACHE_TTL = 180000
+const WEATHER_OFFLINE_CACHE_TTL = 24 * 60 * 60 * 1000
+const CurrencyPanel = lazy(() => import('./CurrencyPanel'))
+const NewsPanel = lazy(() => import('./NewsPanel'))
+const SatellitePanel = lazy(() => import('./SatellitePanel'))
 const FAVORITE_LOCATIONS_KEY = 'hub-favorite-locations'
 const PERSONAL_SITES_KEY = 'hub-personal-sites'
 const MOBILE_PREFERENCES_KEY = 'hub-mobile-preferences'
@@ -112,6 +115,13 @@ const isLocationInfo = (value: unknown): value is LocationInfo => {
   const location = value as Partial<LocationInfo>
   return typeof location.latitude === 'number' && typeof location.longitude === 'number' &&
     typeof location.city === 'string' && typeof location.state === 'string' && typeof location.country === 'string'
+}
+const isWeatherData = (value: unknown): value is WeatherData => {
+  if (!value || typeof value !== 'object') return false
+  const weather = value as Partial<WeatherData>
+  return Boolean(weather.current && typeof weather.current === 'object'
+    && weather.hourly && Array.isArray(weather.hourly.time)
+    && weather.daily && Array.isArray(weather.daily.time))
 }
 const readFavoriteLocations = (): FavoriteLocationsState => {
   try {
@@ -220,7 +230,7 @@ const buildCitySuggestion = (result: any): CitySuggestion | null => {
   }
 }
 
-const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> => {
+const fetchCitySuggestions = async (query: string, signal?: AbortSignal): Promise<CitySuggestion[]> => {
   const trimmed = query.trim()
   if (!trimmed || trimmed.length < 2) return []
 
@@ -228,7 +238,7 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
 
   if (googleKey) {
     try {
-      const googleResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(trimmed)}&components=country:BR&language=pt-BR&key=${encodeURIComponent(googleKey)}`)
+      const googleResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(trimmed)}&components=country:BR&language=pt-BR&key=${encodeURIComponent(googleKey)}`, { signal })
       if (googleResponse.ok) {
         const googleData = await googleResponse.json()
         if (googleData.status === 'OK' && Array.isArray(googleData.results)) {
@@ -256,11 +266,12 @@ const fetchCitySuggestions = async (query: string): Promise<CitySuggestion[]> =>
         }
       }
     } catch {
+      if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
       // fallback para o Nominatim quando a API do Google falhar ou não estiver disponível
     }
   }
 
-  const nominatimResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&q=${encodeURIComponent(trimmed)}&accept-language=pt-BR&countrycodes=br&addressdetails=1`)
+  const nominatimResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&q=${encodeURIComponent(trimmed)}&accept-language=pt-BR&countrycodes=br&addressdetails=1`, { signal })
   if (!nominatimResponse.ok) return []
 
   const nominatimData = await nominatimResponse.json()
@@ -495,6 +506,7 @@ function App() {
     ? mobileTabs.find(({ id }) => id === new URLSearchParams(window.location.search).get('androidPreviewTab'))?.id
     : undefined
   const [now, setNow] = useState(new Date())
+  const [isMobileHeaderCompact, setIsMobileHeaderCompact] = useState(false)
   const [activeMobileTab, setActiveMobileTab] = useState<(typeof mobileTabs)[number]['id']>(previewTab || 'home')
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [isPullRefreshing, setIsPullRefreshing] = useState(false)
@@ -504,6 +516,7 @@ function App() {
   const [locationError, setLocationError] = useState('')
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [weatherError, setWeatherError] = useState('')
+  const [isWeatherOfflineCache, setIsWeatherOfflineCache] = useState(false)
   const [loadingWeather, setLoadingWeather] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [isResettingSite, setIsResettingSite] = useState(false)
@@ -727,20 +740,35 @@ function App() {
 
   useEffect(() => {
     const trimmed = cityQuery.trim()
+    if (selectedCitySuggestion && normalizeCityKey(selectedCitySuggestion.label) === normalizeCityKey(trimmed)) {
+      setCitySuggestions([])
+      return
+    }
     if (!trimmed || trimmed.length < 2) {
       setCitySuggestions([])
       return
     }
 
+    const controller = new AbortController()
     const timeout = window.setTimeout(async () => {
-      const suggestions = await fetchCitySuggestions(trimmed)
-      setCitySuggestions(suggestions)
-      if (!selectedCitySuggestion || selectedCitySuggestion.label.toLowerCase() !== trimmed.toLowerCase()) {
+      try {
+        const suggestions = await fetchCitySuggestions(trimmed, controller.signal)
+        if (controller.signal.aborted) return
+        setCitySuggestions(suggestions)
         setSelectedCitySuggestion(null)
+        setCityLookupError('')
+      } catch (error) {
+        if (controller.signal.aborted) return
+        console.error('Não foi possível buscar sugestões de cidades.', error)
+        setCitySuggestions([])
+        setCityLookupError('Não foi possível buscar cidades agora. Verifique a conexão e tente novamente.')
       }
     }, 300)
 
-    return () => window.clearTimeout(timeout)
+    return () => {
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
   }, [cityQuery, selectedCitySuggestion])
 
   const loadCurrentLocation = () => {
@@ -972,6 +1000,18 @@ function App() {
   const loadWeather = async (coordinates: Coordinates, forceRefresh = false) => {
     setLoadingWeather(true)
     setWeatherError('')
+    const cacheKey = `hub-weather-v4:${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`
+    const cached = readPersistentCache<WeatherCache>(cacheKey)
+    const cachedWeather = cached && isWeatherData(cached.value.weather)
+      ? { weather: cached.value.weather, timestamp: cached.timestamp }
+      : null
+    if (!navigator.onLine && cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_OFFLINE_CACHE_TTL) {
+      setWeather(cachedWeather.weather)
+      setLastUpdated(new Date(cachedWeather.timestamp))
+      setIsWeatherOfflineCache(true)
+      setLoadingWeather(false)
+      return
+    }
     try {
       const params = new URLSearchParams({
         latitude: String(coordinates.latitude),
@@ -982,26 +1022,38 @@ function App() {
         hourly: 'temperature_2m,precipitation,precipitation_probability,weather_code',
         daily: 'weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min,sunrise,sunset',
       })
-      const cacheKey = `hub-weather-v3:${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`
-      const cached = sessionStorage.getItem(cacheKey)
-      if (!forceRefresh && cached) {
-        const saved = JSON.parse(cached) as { timestamp: number; weather: WeatherData }
-        if (Date.now() - saved.timestamp < WEATHER_CACHE_TTL) {
-          setWeather(saved.weather)
-          setLastUpdated(new Date(saved.timestamp))
+      if (!forceRefresh && cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_CACHE_TTL) {
+          setWeather(cachedWeather.weather)
+          setLastUpdated(new Date(cachedWeather.timestamp))
+          setIsWeatherOfflineCache(false)
           setLoadingWeather(false)
           return
-        }
       }
 
-      const response = await fetch(`${weatherUrl}?${params}`)
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), 12000)
+      let response: Response
+      try {
+        response = await fetch(`${weatherUrl}?${params}`, { signal: controller.signal })
+      } finally {
+        window.clearTimeout(timeout)
+      }
       if (!response.ok) throw new Error('weather')
       const nextWeather = await response.json() as WeatherData
-      sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), weather: nextWeather }))
+      const timestamp = Date.now()
+      writePersistentCache(cacheKey, { weather: nextWeather }, timestamp)
       setWeather(nextWeather)
-      setLastUpdated(new Date())
+      setLastUpdated(new Date(timestamp))
+      setIsWeatherOfflineCache(false)
     } catch {
-      setWeatherError('Não foi possível atualizar os dados meteorológicos. Tentaremos novamente automaticamente.')
+      if (cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_OFFLINE_CACHE_TTL) {
+        setWeather(cachedWeather.weather)
+        setLastUpdated(new Date(cachedWeather.timestamp))
+        setIsWeatherOfflineCache(true)
+        setWeatherError('')
+      } else {
+        setWeatherError('Não foi possível atualizar os dados meteorológicos. Tentaremos novamente automaticamente.')
+      }
     } finally {
       setLoadingWeather(false)
     }
@@ -1111,6 +1163,10 @@ function App() {
     <main
       className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ` android-app theme-${mobilePreferences.theme}` : ''}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}`}
       translate="no"
+      onScroll={isAndroidApplication ? (event) => {
+        const shouldCompactHeader = event.currentTarget.scrollTop > 24
+        setIsMobileHeaderCompact((isCompact) => isCompact === shouldCompactHeader ? isCompact : shouldCompactHeader)
+      } : undefined}
       onTouchStart={isAndroidApplication ? (event) => {
         pullStartY.current = event.currentTarget.scrollTop <= 2 ? event.touches[0]?.clientY ?? null : null
       } : undefined}
@@ -1125,7 +1181,7 @@ function App() {
       onTouchCancel={() => { pullStartY.current = null }}
     >
       {isAndroidApplication && !isTvMode && (
-        <header className={`hero-header mobile-fixed-header theme-${mobilePreferences.theme}`}>
+        <header className={`hero-header mobile-fixed-header theme-${mobilePreferences.theme}${isMobileHeaderCompact ? ' is-compact' : ''}`}>
           {androidHeaderContent}
         </header>
       )}
@@ -1175,8 +1231,9 @@ function App() {
           </div>
 
           {weather && lastUpdated && (
-            <p className="weather-updated">
-              Clima atualizado às {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            <p className="weather-updated" aria-live="polite">
+            {isWeatherOfflineCache ? 'Dados salvos para uso offline · ' : 'Clima atualizado às '}
+            {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </p>
           )}
 
@@ -1258,7 +1315,9 @@ function App() {
                   <Metric key={id} label={weatherMetricOptions.find((metric) => metric.id === id)?.label || id} {...metricData[id]} />
                 ))}
               </div>
-              <CurrencyPanel />
+              <Suspense fallback={<div className="panel-loading" role="status">Carregando cotações...</div>}>
+                <CurrencyPanel />
+              </Suspense>
             </>
           )}
 
@@ -1330,7 +1389,9 @@ function App() {
 
       {(!isAndroidApplication || activeMobileTab === 'satellite' || isTvMode) && (
         <>
-      <SatellitePanel />
+      <Suspense fallback={<div className="panel panel-loading" role="status">Carregando imagens de satélite...</div>}>
+        <SatellitePanel />
+      </Suspense>
 
       <section className="radar-links-panel">
         <div className="useful-heading">
@@ -1350,6 +1411,7 @@ function App() {
 
       {(!isAndroidApplication || activeMobileTab === 'news') && <div className={isAndroidApplication ? 'mobile-tab-content' : undefined}>
       {isAndroidApplication && <div className="mobile-view-heading"><span className="section-kicker">ATUALIDADES</span><h2>Notícias</h2><p>Manchetes para acompanhar o que acontece.</p></div>}
+      <Suspense fallback={<div className="news-portals panel-loading" role="status">Carregando notícias...</div>}>
       <div className="news-portals">
         {isNewsCategoryVisible('local') && <NewsPanel locationCity={localNewsCity} locationState={location?.state ? getStateAbbreviation(location.state) : null} local title={localNewsCity && location ? `Notícias de ${formatLocationLabel(location)}` : 'Notícias da sua região'} query="notícias locais" />}
         {isNewsCategoryVisible('games') && <NewsPanel locationCity={location?.city || null} title="Portal de notícias de jogos" query={newsSearchQueries.games} />}
@@ -1359,6 +1421,7 @@ function App() {
         {isNewsCategoryVisible('global') && <NewsPanel locationCity={location?.city || null} title="Portal de notícias globais" query={newsSearchQueries.global} />}
         {isAndroidApplication && mobilePreferences.newsCategories.length === 0 && <p className="preferences-empty-state">Nenhum assunto selecionado. Escolha os temas em Mais → Personalização.</p>}
       </div>
+      </Suspense>
       </div>}
 
       {isAndroidApplication && activeMobileTab === 'more' && (
@@ -1576,10 +1639,19 @@ function App() {
 
       {isCityModalOpen && (
         <div className="location-modal-backdrop" onClick={() => setIsCityModalOpen(false)}>
-          <div className="location-modal" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="location-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="city-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setIsCityModalOpen(false)
+            }}
+          >
             <div className="location-modal-header">
-              <h3>Ver clima em outro local</h3>
-              <button type="button" className="modal-close-button" onClick={() => setIsCityModalOpen(false)}>×</button>
+              <h3 id="city-dialog-title">Ver clima em outro local</h3>
+              <button type="button" className="modal-close-button" onClick={() => setIsCityModalOpen(false)} aria-label="Fechar busca de cidade">×</button>
             </div>
             {favoriteLocations.items.length > 0 && (
               <section className="favorite-locations" aria-label="Cidades favoritas">
@@ -1611,21 +1683,25 @@ function App() {
                 className="location-modal-input"
                 type="text"
                 value={cityQuery}
+                aria-autocomplete="list"
+                aria-controls="city-suggestions"
+                aria-expanded={citySuggestions.length > 0}
                 onChange={(event) => {
                   setCityQuery(event.target.value)
                   setSelectedCitySuggestion(null)
                 }}
                 placeholder="Ex.: Santos, São Paulo, Rio de Janeiro"
                 autoFocus
-                list="city-suggestions"
               />
               {citySuggestions.length > 0 && (
-                <div className="city-suggestions" role="listbox">
+                <div className="city-suggestions" id="city-suggestions" role="listbox" aria-label="Sugestões de cidades">
                   {citySuggestions.map((suggestion) => (
                     <button
                       key={`${suggestion.label}-${suggestion.latitude}-${suggestion.longitude}`}
                       type="button"
                       className="city-suggestion-item"
+                      role="option"
+                      aria-selected={selectedCitySuggestion?.label === suggestion.label}
                       onClick={() => chooseCitySuggestion(suggestion)}
                     >
                       <MapPin size={14} />
