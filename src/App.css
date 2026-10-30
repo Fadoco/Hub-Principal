@@ -305,7 +305,7 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .tv-mode .satellite-controls { margin-top: 8px; }
 .tv-mode .satellite-timeline { margin: 7px 0 0; }
 .tv-mode .satellite-attribution { font-size: 10px; margin-top: 4px; }
-.tv-mode > .radar-links-panel, .tv-mode > .news-portals, .tv-mode > .useful-sites, .tv-mode > footer { display: none; }
+.tv-mode > .radar-links-panel, .tv-mode .news-section, .tv-mode > .useful-sites, .tv-mode > footer { display: none; }
 
 .news-portals { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
 .news-panel { contain: layout paint; padding: 19px; }

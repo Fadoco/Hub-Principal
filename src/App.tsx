@@ -1410,7 +1410,7 @@ function App() {
         </>
       )}
 
-      {(!isAndroidApplication || activeMobileTab === 'news') && <div className={isAndroidApplication ? 'mobile-tab-content' : undefined}>
+      {(!isAndroidApplication || activeMobileTab === 'news') && <div className={`news-section${isAndroidApplication ? ' mobile-tab-content' : ''}`}>
       {isAndroidApplication && <div className="mobile-view-heading"><span className="section-kicker">ATUALIDADES</span><h2>Notícias</h2><p>Manchetes para acompanhar o que acontece.</p></div>}
       <Suspense fallback={<div className="news-portals panel-loading" role="status">Carregando notícias...</div>}>
       <div className="news-portals">

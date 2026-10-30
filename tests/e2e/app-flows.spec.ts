@@ -85,6 +85,20 @@ test('does not show the generic useful sites section on the public website', asy
   await expect(page.getByText('Remover fundo')).toHaveCount(0)
 })
 
+test('keeps weather and satellite visible and hides news in website TV mode', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Modo TV' }).click()
+
+  await expect(page.locator('.weather-panel')).toBeVisible()
+  await expect(page.locator('.satellite-panel')).toBeVisible()
+  await expect(page.locator('.news-portals')).toBeHidden()
+
+  const weatherHeight = await page.locator('.weather-panel').evaluate((element) => element.getBoundingClientRect().height)
+  const satelliteHeight = await page.locator('.satellite-panel').evaluate((element) => element.getBoundingClientRect().height)
+  expect(weatherHeight).toBeGreaterThan(200)
+  expect(satelliteHeight).toBeGreaterThan(200)
+})
+
 test('searches and selects a city from suggestions', async ({ page }) => {
   await page.getByRole('button', { name: 'Ver clima em outro local' }).click()
   const cityInput = page.getByRole('textbox', { name: 'Cidade' })
