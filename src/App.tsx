@@ -1164,8 +1164,8 @@ function App() {
       className={`app-shell notranslate${isTvMode ? ' tv-mode' : ''}${isAndroidApplication ? ` android-app theme-${mobilePreferences.theme}` : ''}${isAndroidApplication && mobilePreferences.textSize === 'large' ? ' text-size-large' : ''}`}
       translate="no"
       onScroll={isAndroidApplication ? (event) => {
-        const shouldCompactHeader = event.currentTarget.scrollTop > 24
-        setIsMobileHeaderCompact((isCompact) => isCompact === shouldCompactHeader ? isCompact : shouldCompactHeader)
+        const scrollTop = event.currentTarget.scrollTop
+        setIsMobileHeaderCompact((isCompact) => scrollTop > (isCompact ? 8 : 32))
       } : undefined}
       onTouchStart={isAndroidApplication ? (event) => {
         pullStartY.current = event.currentTarget.scrollTop <= 2 ? event.touches[0]?.clientY ?? null : null

@@ -478,6 +478,7 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   margin: 0 auto;
   max-width: 560px;
   min-height: 0;
+  overflow-anchor: none;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
