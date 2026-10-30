@@ -866,7 +866,7 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 .update-prompt-backdrop.theme-light .update-prompt .update-prompt-status { color: #17653a; }
 .update-prompt-backdrop.theme-light .update-prompt .update-prompt-error { color: #8c2525; }
 .update-prompt-backdrop.theme-light .update-prompt-later { border-color: rgba(23, 32, 51, .2); color: #273448; }
-@media (orientation: landscape) {
+@media (orientation: landscape) and (min-width: 801px) {
   body.tv-mode-active { overflow: hidden; }
   .android-app.tv-mode.app-shell {
     display: grid; gap: 8px; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
@@ -898,6 +898,45 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .android-app.tv-mode .satellite-panel .section-heading { margin-bottom: 5px; }
   .android-app.tv-mode .satellite-viewer { min-height: 0; }
   .android-app.tv-mode .mobile-bottom-nav { display: none; }
+}
+@media (max-width: 800px) {
+  html.android-app-active body.tv-mode-active { overflow: hidden; }
+  .android-app.tv-mode.app-shell {
+    align-content: start; display: flex; flex-direction: column; gap: 12px; height: 100dvh;
+    max-width: none; min-height: 0; overflow-x: hidden; overflow-y: auto;
+    padding: 8px 12px calc(16px + env(safe-area-inset-bottom)); width: 100%;
+  }
+  .android-app.tv-mode .hero-header {
+    align-items: center; background: var(--page); border-bottom: 1px solid var(--line); display: flex;
+    flex: 0 0 auto; grid-column: auto; grid-row: auto; height: auto; margin: 0; min-height: 0;
+    padding: 6px 0 10px; position: relative; text-align: center; top: auto; width: 100%;
+  }
+  .android-app.tv-mode .mobile-app-header {
+    align-items: center; flex-direction: column; gap: 4px; min-height: 0; padding: 0; width: 100%;
+  }
+  .android-app.tv-mode .mobile-tv-exit {
+    align-self: flex-end; font-size: 10px; margin-bottom: 2px; padding: 6px 9px;
+    position: static; transform: none;
+  }
+  .android-app.tv-mode .mobile-header-center { gap: 3px; }
+  .android-app.tv-mode .mobile-date { font-size: clamp(10px, 3vw, 12px); }
+  .android-app.tv-mode .clock { font-size: clamp(26px, 8vw, 36px); }
+  .android-app.tv-mode .mobile-pull-status { display: none; }
+  .android-app.tv-mode .mobile-pull-status.is-error { display: block; }
+  .android-app.tv-mode .mobile-bottom-nav { display: none; }
+  .android-app.tv-mode .weather-panel {
+    align-self: stretch; grid-column: auto; grid-row: auto; height: auto; max-height: none;
+    min-height: 0; overflow: visible; padding: 16px 14px;
+  }
+  .android-app.tv-mode .metric-grid { gap: 0 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .android-app.tv-mode .metric:not(:nth-child(3n+1)) { border-left: 0; padding-left: 0; }
+  .android-app.tv-mode .metric:not(:nth-child(2n+1)) { border-left: 1px solid var(--line); padding-left: 10px; }
+  .android-app.tv-mode .satellite-panel {
+    align-self: stretch; display: flex; flex-direction: column; grid-column: auto; grid-row: auto;
+    height: auto; margin: 0; min-height: 0; overflow: visible; padding: 14px;
+  }
+  .android-app.tv-mode .satellite-viewer { flex: 0 0 auto; height: min(42dvh, 300px); min-height: 180px; }
+  .android-app.tv-mode .satellite-image { height: 100%; max-height: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }

@@ -99,6 +99,32 @@ test('keeps weather and satellite visible and hides news in website TV mode', as
   expect(satelliteHeight).toBeGreaterThan(200)
 })
 
+test('adapts Android TV mode to a small portrait screen without clipping panels', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await page.getByRole('button', { name: 'Mais' }).click()
+  await page.getByRole('button', { name: /Ativar modo TV/ }).click()
+
+  const app = page.locator('main.android-app.tv-mode')
+  const layout = await app.evaluate((element) => ({
+    display: getComputedStyle(element).display,
+    overflowY: getComputedStyle(element).overflowY,
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+  }))
+  expect(layout.display).toBe('flex')
+  expect(layout.overflowY).toBe('auto')
+  expect(layout.scrollHeight).toBeGreaterThan(layout.clientHeight)
+  await expect(page.locator('.mobile-bottom-nav')).toBeHidden()
+  await expect(page.locator('.weather-panel')).toHaveCSS('overflow-y', 'visible')
+  await expect(page.locator('.weather-panel')).toBeVisible()
+
+  await page.locator('.satellite-panel').scrollIntoViewIfNeeded()
+  await expect(page.locator('.satellite-panel')).toBeVisible()
+  const satelliteViewerHeight = await page.locator('.satellite-viewer').evaluate((element) => element.getBoundingClientRect().height)
+  expect(satelliteViewerHeight).toBeGreaterThanOrEqual(180)
+  expect(satelliteViewerHeight).toBeLessThanOrEqual(300)
+})
+
 test('searches and selects a city from suggestions', async ({ page }) => {
   await page.getByRole('button', { name: 'Ver clima em outro local' }).click()
   const cityInput = page.getByRole('textbox', { name: 'Cidade' })

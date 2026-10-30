@@ -1114,7 +1114,9 @@ function App() {
       setIsTvMode(enabled)
       if (enabled) {
         setActiveMobileTab('home')
-        window.scrollTo({ top: 0, behavior: 'smooth' })
+        const appShell = document.querySelector<HTMLElement>('.android-app')
+        if (appShell) appShell.scrollTop = 0
+        else window.scrollTo({ top: 0, behavior: 'smooth' })
       }
     } catch (error) {
       console.error('Não foi possível alterar a orientação do modo TV.', error)
