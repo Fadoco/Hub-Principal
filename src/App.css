@@ -866,7 +866,7 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 .update-prompt-backdrop.theme-light .update-prompt .update-prompt-status { color: #17653a; }
 .update-prompt-backdrop.theme-light .update-prompt .update-prompt-error { color: #8c2525; }
 .update-prompt-backdrop.theme-light .update-prompt-later { border-color: rgba(23, 32, 51, .2); color: #273448; }
-@media (orientation: landscape) and (min-width: 801px) {
+@media (orientation: landscape) and (min-width: 801px) and (min-height: 601px) {
   body.tv-mode-active { overflow: hidden; }
   .android-app.tv-mode.app-shell {
     display: grid; gap: 8px; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
@@ -899,7 +899,7 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .android-app.tv-mode .satellite-viewer { min-height: 0; }
   .android-app.tv-mode .mobile-bottom-nav { display: none; }
 }
-@media (max-width: 800px) {
+@media (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
   html.android-app-active body.tv-mode-active { overflow: hidden; }
   .android-app.tv-mode.app-shell {
     align-content: start; display: flex; flex-direction: column; gap: 12px; height: 100dvh;

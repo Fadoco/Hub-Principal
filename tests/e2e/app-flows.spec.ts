@@ -123,6 +123,10 @@ test('adapts Android TV mode to a small portrait screen without clipping panels'
   const satelliteViewerHeight = await page.locator('.satellite-viewer').evaluate((element) => element.getBoundingClientRect().height)
   expect(satelliteViewerHeight).toBeGreaterThanOrEqual(180)
   expect(satelliteViewerHeight).toBeLessThanOrEqual(300)
+
+  await page.setViewportSize({ width: 844, height: 390 })
+  expect(await app.evaluate((element) => getComputedStyle(element).display)).toBe('flex')
+  expect(await app.evaluate((element) => element.scrollHeight)).toBeGreaterThan(await app.evaluate((element) => element.clientHeight))
 })
 
 test('searches and selects a city from suggestions', async ({ page }) => {
