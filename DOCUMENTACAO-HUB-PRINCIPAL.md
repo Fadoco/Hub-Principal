@@ -508,3 +508,114 @@ Se quiser, posso continuar e transformar essa documentação em uma versão aind
 - fluxograma do funcionamento;
 - checklist de melhorias em ordem de prioridade;
 - documento em formato de apresentação ou README pronto para GitHub.
+
+---
+
+## 17. Desenvolvimento e publicação
+
+### 17.1 Rodar o projeto localmente
+
+Instale as dependências e inicie o servidor de desenvolvimento:
+
+```powershell
+npm install
+npm run dev
+```
+
+Abra `http://127.0.0.1:5173/`. Para conferir uma prévia do layout Android, use `http://127.0.0.1:5173/?androidPreview=1`.
+
+Comandos de build e validação:
+
+```powershell
+npm run build
+npm run build:pages
+npm run lint
+npm test
+npm run preview
+```
+
+### 17.2 Desenvolvimento Android
+
+O aplicativo Android usa Capacitor e seu projeto nativo fica na pasta `apk/`. Para sincronizar os arquivos web e abrir o projeto no Android Studio:
+
+```powershell
+npm run sync:android
+npm run open:android
+```
+
+No Windows, gere um APK de depuração com Android SDK (incluindo a plataforma Android 36) e Java 21 ou superior:
+
+```powershell
+npm run build:android
+```
+
+O APK de depuração é gerado em `apk/Hub-Principal-debug.apk` e `apk/app/build/outputs/apk/debug/app-debug.apk`.
+
+### 17.3 Atualização automática do aplicativo
+
+O app verifica `https://fadoco.github.io/Hub-Principal/updates/version.json` ao abrir e ao voltar para primeiro plano. Quando encontra uma versão mais recente, baixa o APK e permite ao usuário iniciar a instalação. Antes de abrir o instalador, o app verifica o SHA-256 do arquivo. O Android sempre pede confirmação e pode exigir autorização para instalar apps baixados por aquela fonte.
+
+### 17.4 Publicação do site e do APK
+
+O workflow [.github/workflows/publish-pages.yml](./.github/workflows/publish-pages.yml) publica o site no GitHub Pages quando há alterações relevantes na branch `main`. Quando há alterações de código Android ou do app, também compila e assina um novo APK, atualiza `docs/updates/version.json` e salva o APK publicado e o manifesto como referência para a próxima versão.
+
+Para configurar a publicação automática do APK:
+
+1. Em **Settings → Secrets and variables → Actions**, crie estes Repository secrets com os dados da keystore de publicação original:
+   - `ANDROID_KEYSTORE_BASE64`: conteúdo Base64 da keystore original (`apk/release-signing.jks`).
+   - `ANDROID_KEYSTORE_PASSWORD`: senha de armazenamento da keystore.
+   - `ANDROID_KEY_ALIAS`: alias da chave.
+   - `ANDROID_KEY_PASSWORD`: senha da chave.
+2. Converta a keystore para Base64 apenas em uma ferramenta local confiável e offline. Não use sites de conversão, não inclua os valores em arquivos ou comandos versionados e não os imprima em logs. Informe os valores diretamente nos campos de secrets do GitHub. Senhas e alias podem ser obtidos da configuração local ignorada `apk/release-signing.properties`.
+3. Configure **Settings → Pages → Build and deployment → Source → GitHub Actions**.
+4. Em **Settings → Actions → General → Workflow permissions**, permita acesso de escrita ao conteúdo do repositório para o `GITHUB_TOKEN`. Se a branch `main` tiver regras de proteção, permita que esse token salve o APK e o manifesto publicados.
+
+O workflow reconstrói a keystore apenas durante o job e remove os arquivos temporários ao terminar. **Não gere outra chave:** sem a chave original, não é possível assinar atualizações compatíveis com instalações existentes. O build de release requer Java 21, Android SDK e os secrets acima; esses passos são realizados pelo GitHub Actions na publicação.
+
+Antes de publicar uma nova versão Android, incremente `versionCode` e `versionName` em `apk/app/build.gradle`. A validação exige que ambos sejam superiores aos valores publicados. O manifesto e o APK são publicados em `https://fadoco.github.io/Hub-Principal/updates/`; não edite nem envie `docs/updates/` manualmente.
+
+Como alternativa operacional, um APK assinado pode ser enviado pela interface web do GitHub para `updates/Hub-Principal.apk` e commitado na branch `main`. O workflow verifica o pacote, a assinatura, a versão e o SHA-256 contra o APK publicado; uma assinatura incompatível é rejeitada.
+
+### 17.5 Worker de notícias
+
+O frontend do GitHub Pages não pode ler feeds diretamente devido às políticas CORS. O Cloudflare Worker do projeto busca o RSS de notícias do Bing, valida a origem e a consulta, limita cada IP a 120 requisições por minuto e mantém cache por cinco minutos. O rate limit reduz abuso, mas não substitui proteção anti-DDoS. CORS controla quais páginas podem ler uma resposta no navegador; não autentica clientes nem impede chamadas automatizadas. O endpoint público padrão já é usado pelo app.
+
+Para desenvolver ou substituir o Worker:
+
+1. Crie uma conta Cloudflare e autentique o Wrangler:
+
+   ```powershell
+   npx wrangler login
+   ```
+
+2. Publique o Worker:
+
+   ```powershell
+   npm run deploy:news-api
+   ```
+
+   O Wrangler exibirá o endereço `workers.dev`; o endpoint de notícias termina em `/news`.
+
+3. Opcionalmente, configure outro endpoint compatível em `.env.local` (arquivo local não versionado):
+
+   ```text
+   VITE_NEWS_API_URL=https://SEU-WORKER.workers.dev/news
+   ```
+
+4. Gere o build de Pages:
+
+   ```powershell
+   npm run build:pages
+   ```
+
+Para um domínio próprio, adicione a origem em `ALLOWED_ORIGINS` no [worker/wrangler.toml](./worker/wrangler.toml) e publique o Worker novamente. Endpoints personalizados de clima e notícias devem usar HTTPS e são incluídos na política CSP do build.
+
+### 17.6 Segurança e configuração
+
+- O build de produção aplica uma Content Security Policy (CSP) que restringe scripts, frames e conexões aos serviços usados pelo app. Ao adicionar uma integração externa, inclua somente a origem necessária em `vite.config.ts`.
+- O Android bloqueia tráfego HTTP sem criptografia. APIs e serviços usados pelo app devem estar disponíveis por HTTPS.
+- O Worker limita requisições por IP, valida parâmetros e restringe origens de navegador. Essas medidas reduzem abuso, mas o endpoint continua público e não deve receber segredos.
+- GitHub Pages não permite configurar cabeçalhos HTTP de segurança personalizados neste projeto. A CSP é entregue como meta tag e não substitui cabeçalhos como HSTS ou `frame-ancestors`; para WAF e controle completo de cabeçalhos, publique atrás de um proxy/CDN com domínio próprio.
+- Nunca coloque chaves privadas no frontend, em variáveis `VITE_*` ou no APK. Tudo que é distribuído ao navegador ou empacotado no app pode ser extraído.
+
+Para substituir o endpoint padrão de notícias na publicação, configure `VITE_NEWS_API_URL` como Actions variable. O workflow gera o build em `docs/` e publica o GitHub Pages automaticamente. O endereço público do site é `https://fadoco.github.io/Hub-Principal/`.
