@@ -69,6 +69,7 @@ test.beforeEach(async ({ page }) => {
 test('starts with the weather panel and lazily loads the news tab', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Clima agora' })).toBeVisible()
   await expect(page.getByText('21°C')).toBeVisible()
+  await expect(page.locator('.day-rain-time').first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Notícias', exact: true })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Notícias' }).click()

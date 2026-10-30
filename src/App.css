@@ -193,7 +193,9 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .day-item { align-items: center; border-bottom: 1px solid var(--line); column-gap: 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); padding: 11px 0; }
 .day-item span { color: var(--muted); font-size: 12px; text-transform: capitalize; }
 .day-weather { align-items: center; display: flex; gap: 5px; }
+.day-rain-chance { display: grid; gap: 3px; justify-items: start; }
 .day-weather small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.day-weather .day-rain-time { font-size: 10px; }
 .day-weather .rain-probability { background: rgba(255, 50, 65, .18); border-radius: 4px; color: #ff4d5a; font-size: 12px; font-weight: 750; padding: 4px 6px; }
 .day-weather.high-rain .rain-probability { background: rgba(255, 50, 65, .25); color: #ff3547; }
 .day-item strong { color: var(--ink); font-size: 12px; font-weight: 570; text-align: right; white-space: nowrap; }

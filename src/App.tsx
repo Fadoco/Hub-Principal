@@ -1368,16 +1368,29 @@ function App() {
           <div className="daily-list">
             {daily.map((day, index) => {
               const rainProbability = weather?.daily.precipitation_probability_max[index]
+              const peakRainHour = weather?.hourly.time.reduce<{ time: string; probability: number } | null>((highest, time, hourIndex) => {
+                if (time.slice(0, 10) !== day || (day === forecastNow.slice(0, 10) && time < forecastNow)) return highest
+                const probability = weather.hourly.precipitation_probability[hourIndex]
+                if (typeof probability !== 'number' || (highest && highest.probability >= probability)) return highest
+                return { time, probability }
+              }, null)
+              const peakRainTime = peakRainHour && typeof rainProbability === 'number' &&
+                peakRainHour.probability === rainProbability && rainProbability > 0
+                ? peakRainHour.time
+                : null
               return (
                 <div className="day-item" key={day}>
                   <span>{index === 0 ? 'Hoje' : index === 1 ? 'Amanhã' : formatDay(day)}</span>
                   <div
                     className={typeof rainProbability === 'number' && rainProbability >= 50 ? 'day-weather high-rain' : 'day-weather'}
-                    title="Probabilidade máxima de chuva"
-                    aria-label={`Chance de chuva: ${formatNumber(rainProbability, '%')}`}
+                    title={peakRainTime ? `Probabilidade máxima de chuva às ${formatTime(peakRainTime)}` : 'Probabilidade máxima de chuva'}
+                    aria-label={`Chance de chuva: ${formatNumber(rainProbability, '%')}${peakRainTime ? `, com pico às ${formatTime(peakRainTime)}` : ''}`}
                   >
                     <WeatherIcon code={weather?.daily.weather_code[index] || 0} size={21} />
-                    <small className="rain-probability">{formatNumber(rainProbability, '%')} chuva</small>
+                    <div className="day-rain-chance">
+                      <small className="rain-probability">{formatNumber(rainProbability, '%')} chuva</small>
+                      {peakRainTime && <small className="day-rain-time">às {formatTime(peakRainTime)}</small>}
+                    </div>
                   </div>
                   <strong>{formatNumber(weather?.daily.temperature_2m_max[index], '°')} / {formatNumber(weather?.daily.temperature_2m_min[index], '°')}</strong>
                 </div>
