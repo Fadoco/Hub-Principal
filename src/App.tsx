@@ -1435,7 +1435,7 @@ function App() {
 
           {weather && lastUpdated && (
             <p className="weather-updated" aria-live="polite">
-              {isWeatherOfflineCache ? `Cache offline: ${weatherSourceLabel}` : `Fonte: ${weatherSourceLabel}`}
+              {isWeatherOfflineCache ? `Dados salvos para uso offline · ${weatherSourceLabel}` : `Fonte: ${weatherSourceLabel}`}
               {weatherDataTime ? ` · dado de ${weatherDataTime}` : ''}
               {` · consultado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
             </p>
