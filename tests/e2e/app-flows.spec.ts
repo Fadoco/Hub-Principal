@@ -69,6 +69,8 @@ test.beforeEach(async ({ page }) => {
 test('starts with the weather panel and lazily loads the news tab', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Clima agora' })).toBeVisible()
   await expect(page.getByText('21°C')).toBeVisible()
+  await expect(page.locator('.weather-updated')).toContainText('Fonte: Open-Meteo · dado de 09:00')
+  await expect(page.locator('.weather-source-note')).toContainText('podem diferir do Google')
   await expect(page.locator('.day-rain-time').first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Notícias', exact: true })).toHaveCount(0)
 
@@ -77,6 +79,14 @@ test('starts with the weather panel and lazily loads the news tab', async ({ pag
   await expect(page.getByRole('heading', { name: 'Portal de notícias de jogos' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => performance.getEntriesByType('resource')
     .some((resource) => resource.name.includes('/src/NewsPanel.tsx')))).toBe(true)
+})
+
+test('explains that satellite HTTP 503 errors come from the INMET service', async ({ page }) => {
+  await page.route('https://apisat.inmet.gov.br/datas/**', (route) => route.fulfill({ status: 503 }))
+  await page.getByRole('button', { name: 'Satélite' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('O problema está na fonte do satélite, não no app')
+  await expect(page.getByRole('alert')).toContainText('erro 503')
 })
 
 test('keeps thermal sensation inside the weather card on small Android screens', async ({ page }) => {
@@ -291,6 +301,24 @@ test('searches and selects a city from suggestions', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'Clima agora' })).toBeVisible()
   await expect(page.getByText('Jundiaí, SP')).toBeVisible()
+})
+
+test('does not show the previous city weather while a new location is loading', async ({ page }) => {
+  await expect(page.getByText('21°C')).toBeVisible()
+  await page.route('https://api.open-meteo.com/**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await route.fulfill({ json: weatherResponse })
+  })
+
+  await page.getByRole('button', { name: 'Ver clima em outro local' }).click()
+  await page.getByRole('textbox', { name: 'Cidade' }).fill('Jundiaí')
+  await page.getByRole('option', { name: /Jundiaí/ }).waitFor({ state: 'visible' })
+  await page.getByRole('option', { name: /Jundiaí/ }).click()
+  await page.getByRole('button', { name: 'Buscar clima' }).click()
+
+  await expect(page.getByText('Jundiaí, SP')).toBeVisible()
+  await expect(page.getByText('21°C')).toHaveCount(0)
+  await expect(page.locator('.skeleton-block')).toBeVisible()
 })
 
 test('collapses the sticky header during scrolling and restores it at the top', async ({ page }) => {

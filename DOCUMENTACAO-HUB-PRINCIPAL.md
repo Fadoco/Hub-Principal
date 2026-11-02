@@ -176,10 +176,14 @@ Depois, a aplicação:
 - monta lista de previsão por horas e por dias;
 - atualiza automaticamente a cada 5 minutos por padrão.
 
+A interface informa o horário do dado enviado pela fonte e o horário da consulta. Os valores do Open-Meteo são estimativas para as coordenadas selecionadas e podem divergir de outros serviços por diferenças de localização, modelo e atualização; não devem ser interpretados como observação idêntica à do Google ou de uma estação local.
+
 ### 5.4 Imagens de satélite
 O componente `SatellitePanel` busca no serviço de satélite do INMET as imagens GOES mais recentes sobre o Brasil, no produto Topo das Nuvens (T °C). A animação percorre os quadros da data mais recente, pré-carregando os próximos três quadros e mantendo até doze em cache para reduzir as pausas. Os controles ficam reduzidos a ícones de animação, atualização e tela cheia, sem exibir repetidamente mensagens de carregamento.
 
 As imagens são identificadas com a fonte INMET e incluem um link para o portal oficial. Elas são imagens de satélite, não um mosaico de radar de precipitação. Os atalhos IPMet/Unesp continuam abrindo as páginas oficiais em outra aba.
+
+Se a API do INMET responder com HTTP 503, o painel explica que a fonte de imagens está temporariamente indisponível e que o erro não indica falha do app.
 
 ---
 

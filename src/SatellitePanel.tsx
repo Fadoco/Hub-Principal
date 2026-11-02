@@ -14,6 +14,9 @@ const ANIMATION_INTERVAL = 900
 
 async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { signal, cache: 'no-store' })
+  if (response.status === 503) {
+    throw new Error('O serviço de imagens de satélite do INMET está temporariamente indisponível (erro 503). O problema está na fonte do satélite, não no app. Tente novamente mais tarde.')
+  }
   if (!response.ok) throw new Error(`O INMET respondeu com o status ${response.status}.`)
   const body = await response.text()
   try {

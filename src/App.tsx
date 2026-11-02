@@ -42,6 +42,7 @@ type MobilePreferences = {
   theme: MobileTheme
 }
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
+const weatherSourceLabel = weatherUrl.includes('api.open-meteo.com') ? 'Open-Meteo' : 'serviço meteorológico configurado'
 const WEATHER_CACHE_TTL = 180000
 const WEATHER_OFFLINE_CACHE_TTL = 24 * 60 * 60 * 1000
 const CurrencyPanel = lazy(() => import('./CurrencyPanel'))
@@ -524,6 +525,8 @@ function App() {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [isPullRefreshing, setIsPullRefreshing] = useState(false)
   const pullStartY = useRef<number | null>(null)
+  const weatherRequestId = useRef(0)
+  const weatherRequestController = useRef<AbortController | null>(null)
   const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(previewLocation)
   const [location, setLocation] = useState<LocationInfo | null>(previewLocation)
   const [locationError, setLocationError] = useState('')
@@ -798,8 +801,21 @@ function App() {
     updateFavoriteLocations(nextFavorites)
   }
 
+  const changeLocation = (nextLocation: LocationInfo) => {
+    if (!location || location.latitude !== nextLocation.latitude || location.longitude !== nextLocation.longitude) {
+      weatherRequestId.current += 1
+      weatherRequestController.current?.abort()
+      weatherRequestController.current = null
+      setWeather(null)
+      setWeatherError('')
+      setLastUpdated(null)
+      setIsWeatherOfflineCache(false)
+    }
+    setLocation(nextLocation)
+  }
+
   const selectFavoriteLocation = (favorite: LocationInfo) => {
-    setLocation(favorite)
+    changeLocation(favorite)
     setIsCityModalOpen(false)
     setCityLookupError('')
   }
@@ -860,12 +876,12 @@ function App() {
           country: address.address?.country || 'Brasil',
         }
         setCurrentLocation(nextLocation)
-        setLocation(nextLocation)
+        changeLocation(nextLocation)
         setLocationError('')
       } catch {
         const fallbackLocation = { latitude: coords.latitude, longitude: coords.longitude, city: 'Localização atual', state: '', country: '' }
         setCurrentLocation(fallbackLocation)
-        setLocation(fallbackLocation)
+        changeLocation(fallbackLocation)
       }
     }, () => {
       setLocationError('Não foi possível obter sua localização. Verifique as permissões do navegador.')
@@ -914,7 +930,7 @@ function App() {
         country: selectedCitySuggestion.country,
       }
 
-      setLocation(nextLocation)
+      changeLocation(nextLocation)
       setCityQuery('')
       setCitySuggestions([])
       setSelectedCitySuggestion(null)
@@ -940,7 +956,7 @@ function App() {
         country: match.country,
       }
 
-      setLocation(nextLocation)
+      changeLocation(nextLocation)
       setCityQuery('')
       setCitySuggestions([])
       setSelectedCitySuggestion(null)
@@ -952,7 +968,7 @@ function App() {
 
   const backToCurrentLocation = () => {
     if (currentLocation) {
-      setLocation(currentLocation)
+      changeLocation(currentLocation)
       setCityLookupError('')
       return
     }
@@ -1069,6 +1085,9 @@ function App() {
   }
 
   const loadWeather = async (coordinates: Coordinates, forceRefresh = false) => {
+    const requestId = ++weatherRequestId.current
+    weatherRequestController.current?.abort()
+    weatherRequestController.current = null
     setLoadingWeather(true)
     setWeatherError('')
     const cacheKey = `hub-weather-v4:${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`
@@ -1094,14 +1113,15 @@ function App() {
         daily: 'weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min,sunrise,sunset',
       })
       if (!forceRefresh && cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_CACHE_TTL) {
-          setWeather(cachedWeather.weather)
-          setLastUpdated(new Date(cachedWeather.timestamp))
-          setIsWeatherOfflineCache(false)
-          setLoadingWeather(false)
-          return
+        setWeather(cachedWeather.weather)
+        setLastUpdated(new Date(cachedWeather.timestamp))
+        setIsWeatherOfflineCache(false)
+        setLoadingWeather(false)
+        return
       }
 
       const controller = new AbortController()
+      weatherRequestController.current = controller
       const timeout = window.setTimeout(() => controller.abort(), 12000)
       let response: Response
       try {
@@ -1111,12 +1131,14 @@ function App() {
       }
       if (!response.ok) throw new Error('weather')
       const nextWeather = await response.json() as WeatherData
+      if (requestId !== weatherRequestId.current) return
       const timestamp = Date.now()
       writePersistentCache(cacheKey, { weather: nextWeather }, timestamp)
       setWeather(nextWeather)
       setLastUpdated(new Date(timestamp))
       setIsWeatherOfflineCache(false)
     } catch {
+      if (requestId !== weatherRequestId.current) return
       if (cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_OFFLINE_CACHE_TTL) {
         setWeather(cachedWeather.weather)
         setLastUpdated(new Date(cachedWeather.timestamp))
@@ -1126,11 +1148,21 @@ function App() {
         setWeatherError('Não foi possível atualizar os dados meteorológicos. Tentaremos novamente automaticamente.')
       }
     } finally {
-      setLoadingWeather(false)
+      if (requestId === weatherRequestId.current) {
+        weatherRequestController.current = null
+        setLoadingWeather(false)
+      }
     }
   }
 
-  useEffect(() => { if (location) loadWeather(location) }, [location])
+  useEffect(() => () => {
+    weatherRequestId.current += 1
+    weatherRequestController.current?.abort()
+  }, [])
+  useEffect(() => {
+    if (!location) return
+    void loadWeather(location)
+  }, [location])
   useEffect(() => {
     if (!location) return
     const timer = window.setInterval(() => loadWeather(location), Number(import.meta.env.VITE_WEATHER_UPDATE_INTERVAL || 300000))
@@ -1146,6 +1178,9 @@ function App() {
 
   const current = weather?.current
   const currentCode = Number(current?.weather_code || 0)
+  const weatherDataTime = typeof current?.time === 'string' && /^\d{2}:\d{2}$/.test(current.time.slice(11, 16))
+    ? current.time.slice(11, 16)
+    : null
   const uvIndex = typeof current?.uv_index === 'number' ? current.uv_index : undefined
   const uvGuidance = getUvGuidance(uvIndex)
   const hourlyIndexes = useMemo(() => weather?.hourly.time.map((time, index) => ({ time, index })).filter(({ time }) => new Date(time) >= now).slice(0, 6) || [], [weather, now])
@@ -1400,10 +1435,12 @@ function App() {
 
           {weather && lastUpdated && (
             <p className="weather-updated" aria-live="polite">
-            {isWeatherOfflineCache ? 'Dados salvos para uso offline · ' : 'Clima atualizado às '}
-            {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              {isWeatherOfflineCache ? `Cache offline: ${weatherSourceLabel}` : `Fonte: ${weatherSourceLabel}`}
+              {weatherDataTime ? ` · dado de ${weatherDataTime}` : ''}
+              {` · consultado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
             </p>
           )}
+          {weather && <p className="weather-source-note">Temperatura e chuva podem diferir do Google por diferenças de fonte, horário e localização.</p>}
 
           {location ? (
             <div className="location-line">

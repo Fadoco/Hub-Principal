@@ -120,6 +120,7 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .location-status, .source-badge { align-items: center; color: var(--muted); display: flex; font-size: 11px; gap: 5px; margin-left: auto; text-transform: uppercase; }
 .source-badge { color: var(--teal); font-weight: 650; }
 .weather-updated { color: var(--muted); font-size: 11px; margin: -9px 0 16px; }
+.weather-source-note { color: var(--muted); font-size: 10px; line-height: 1.4; margin: -12px 0 16px; }
 .favorite-toggle, .favorite-location-remove {
   align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px;
   color: var(--muted); cursor: pointer; display: inline-flex; justify-content: center; transition: .18s;
