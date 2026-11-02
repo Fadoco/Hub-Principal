@@ -8,8 +8,14 @@ const DEFAULT_ALLOWED_ORIGINS = [
 const FEED_CACHE_TTL_SECONDS = 300
 const STATION_WEATHER_CACHE_TTL_SECONDS = 900
 const STATION_LIST_CACHE_TTL_SECONDS = 86400
+const FORECAST_CACHE_TTL_SECONDS = 300
 const MAX_STATION_DISTANCE_KM = 100
 const MAX_OBSERVATION_AGE_MS = 2 * 60 * 60 * 1000
+const OPEN_METEO_FORECAST_FIELDS = {
+  current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,cloud_cover,uv_index',
+  hourly: 'temperature_2m,precipitation,precipitation_probability,weather_code',
+  daily: 'weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min,sunrise,sunset',
+}
 
 function getAllowedOrigins(env) {
   return (env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(','))
@@ -89,6 +95,68 @@ export default {
     }
     if (requestUrl.pathname === '/health') {
       return jsonResponse({ status: 'ok' }, 200, headers)
+    }
+    if (requestUrl.pathname === '/forecast') {
+      const latitudeValue = requestUrl.searchParams.get('latitude')
+      const longitudeValue = requestUrl.searchParams.get('longitude')
+      const latitude = Number(latitudeValue)
+      const longitude = Number(longitudeValue)
+      if (!latitudeValue || !longitudeValue ||
+          !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+          !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        return jsonResponse({ error: 'Valid latitude and longitude coordinates are required.' }, 400, headers)
+      }
+
+      const latitudeKey = latitude.toFixed(3)
+      const longitudeKey = longitude.toFixed(3)
+      const responseCacheKey = new Request(`${requestUrl.origin}/__forecast?latitude=${latitudeKey}&longitude=${longitudeKey}`)
+      const cachedForecast = await caches.default.match(responseCacheKey)
+      if (cachedForecast) return withCors(cachedForecast, headers)
+
+      const clientIp = request.headers.get('CF-Connecting-IP')
+      if (!clientIp) {
+        console.error('Cloudflare did not provide a client IP for forecast rate limiting.')
+        return jsonResponse({ error: 'Unable to verify request source.' }, 503, headers)
+      }
+      const { success } = await env.NEWS_RATE_LIMITER.limit({ key: clientIp })
+      if (!success) {
+        headers.set('Retry-After', '60')
+        return jsonResponse({ error: 'Too many requests. Please retry in one minute.' }, 429, headers)
+      }
+
+      try {
+        const upstreamUrl = new URL('https://api.open-meteo.com/v1/forecast')
+        upstreamUrl.search = new URLSearchParams({
+          latitude: latitude.toFixed(4),
+          longitude: longitude.toFixed(4),
+          timezone: 'auto',
+          forecast_days: '6',
+          ...OPEN_METEO_FORECAST_FIELDS,
+        }).toString()
+        const upstream = await fetch(upstreamUrl, {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(10000),
+        })
+        if (!upstream.ok) {
+          console.error('Open-Meteo forecast returned an unsuccessful status.', upstream.status)
+          return jsonResponse({ error: 'Weather forecast is temporarily unavailable.' }, 502, headers)
+        }
+
+        const forecast = await upstream.json()
+        if (!forecast || typeof forecast !== 'object' ||
+            !forecast.current || !forecast.hourly || !forecast.daily) {
+          console.error('Open-Meteo forecast returned an unexpected response.')
+          return jsonResponse({ error: 'Weather forecast is temporarily unavailable.' }, 502, headers)
+        }
+        const forecastResponse = jsonResponse(forecast, 200, new Headers({
+          'Cache-Control': `public, max-age=${FORECAST_CACHE_TTL_SECONDS}`,
+        }))
+        context.waitUntil(caches.default.put(responseCacheKey, forecastResponse.clone()))
+        return withCors(forecastResponse, headers)
+      } catch (error) {
+        console.error('Unable to retrieve the Open-Meteo forecast through the fallback.', error)
+        return jsonResponse({ error: 'Weather forecast is temporarily unavailable.' }, 502, headers)
+      }
     }
     if (requestUrl.pathname === '/weather') {
       const latitudeValue = requestUrl.searchParams.get('latitude')

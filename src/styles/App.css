@@ -143,6 +143,10 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .notice { align-items: flex-start; background: rgba(99, 214, 207, .07); border-radius: 7px; color: var(--muted); display: flex; font-size: 12px; gap: 9px; line-height: 1.45; margin-bottom: 14px; padding: 11px; }
 .notice svg { flex: 0 0 auto; }
 .notice.error { background: rgba(255, 143, 143, .09); color: #ffb3b3; }
+.weather-error-notice { align-items: center; flex-wrap: wrap; }
+.weather-error-notice > span { flex: 1 1 180px; }
+.weather-retry-button { background: rgba(255, 179, 179, .1); border: 1px solid rgba(255, 179, 179, .3); border-radius: 5px; color: inherit; cursor: pointer; font-size: 11px; padding: 6px 9px; }
+.weather-retry-button:disabled { cursor: progress; opacity: .6; }
 
 .current-weather { align-items: center; display: flex; gap: 17px; margin: 4px 0 22px; }
 .tv-weather-rain { display: none; }

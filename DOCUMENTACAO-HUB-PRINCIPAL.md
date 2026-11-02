@@ -149,6 +149,8 @@ Quando a localização se torna disponível, o componente dispara `loadWeather(l
 
 A Open-Meteo fornece previsão e métricas para as coordenadas escolhidas. Quando o Worker do projeto tem o secret `INMET_TOKEN` configurado, o app também consulta a leitura de temperatura recente da estação automática operante mais próxima, a até 100 km. A temperatura medida aparece como principal e a comparação com a estimativa do Open-Meteo é exibida na tela. Sem token, leitura recente ou estação próxima, o app mantém a estimativa do Open-Meteo como alternativa.
 
+Se o dispositivo não conseguir acessar diretamente a API Open-Meteo, o app tenta obter a mesma previsão pelo endpoint `/forecast` do Worker. Essa consulta de fallback é limitada por IP e armazenada em cache por cinco minutos.
+
 A API usada para previsão é a Open-Meteo com parâmetros como:
 
 - latitude

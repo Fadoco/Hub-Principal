@@ -106,6 +106,42 @@ test('shows a nearby INMET observation alongside the Open-Meteo estimate', async
   await expect(page.locator('.weather-station-fallback')).toHaveCount(0)
 })
 
+test('uses the Worker forecast fallback when Open-Meteo cannot be reached', async ({ page }) => {
+  let forecastRequests = 0
+  await page.route('https://api.open-meteo.com/**', (route) => route.fulfill({ status: 503 }))
+  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/forecast**', (route) => {
+    forecastRequests += 1
+    return route.fulfill({ json: weatherResponse })
+  })
+  await page.evaluate(() => localStorage.removeItem('hub-weather-v4:-23.550:-46.630'))
+  await page.reload()
+
+  await expect(page.locator('.temperature')).toContainText('21')
+  await expect(page.locator('.weather-error-notice')).toHaveCount(0)
+  expect(forecastRequests).toBeGreaterThan(0)
+})
+
+test('keeps the accuracy note visible and offers a retry if both forecast requests fail', async ({ page }) => {
+  let allowForecast = false
+  let retryRequests = 0
+  await page.route('https://api.open-meteo.com/**', (route) => route.fulfill({ status: 503 }))
+  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/forecast**', (route) => {
+    if (!allowForecast) return route.fulfill({ status: 502, json: { error: 'Forecast temporarily unavailable.' } })
+    retryRequests += 1
+    return route.fulfill({ json: weatherResponse })
+  })
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+
+  await expect(page.locator('.weather-error-notice')).toBeVisible()
+  await expect(page.locator('.weather-source-note')).toContainText('Os dados podem não refletir exatamente as condições locais.')
+  allowForecast = true
+  await page.getByRole('button', { name: 'Tentar novamente' }).click()
+  await expect(page.locator('.temperature')).toContainText('21')
+  await expect(page.locator('.weather-error-notice')).toHaveCount(0)
+  expect(retryRequests).toBeGreaterThan(0)
+})
+
 test('explains that satellite HTTP 503 errors come from the INMET service', async ({ page }) => {
   await page.route('https://apisat.inmet.gov.br/datas/**', (route) => route.fulfill({ status: 503 }))
   await page.getByRole('button', { name: 'Satélite' }).click()

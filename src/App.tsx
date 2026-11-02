@@ -52,6 +52,7 @@ type MobilePreferences = {
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const weatherSourceLabel = weatherUrl.includes('api.open-meteo.com') ? 'Open-Meteo' : 'serviço meteorológico configurado'
 const stationWeatherUrl = import.meta.env.VITE_STATION_WEATHER_API_URL || 'https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather'
+const weatherProxyUrl = `${new URL(stationWeatherUrl).origin}/forecast`
 const WEATHER_CACHE_TTL = 180000
 const WEATHER_OFFLINE_CACHE_TTL = 24 * 60 * 60 * 1000
 const CurrencyPanel = lazy(() => import('./CurrencyPanel'))
@@ -1178,6 +1179,10 @@ function App() {
         hourly: 'temperature_2m,precipitation,precipitation_probability,weather_code',
         daily: 'weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min,sunrise,sunset',
       })
+      const proxyParams = new URLSearchParams({
+        latitude: String(coordinates.latitude),
+        longitude: String(coordinates.longitude),
+      })
       if (!forceRefresh && cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_CACHE_TTL) {
         setWeather(cachedWeather.weather)
         setLastUpdated(new Date(cachedWeather.timestamp))
@@ -1186,16 +1191,27 @@ function App() {
         return
       }
 
-      const controller = new AbortController()
-      weatherRequestController.current = controller
-      const timeout = window.setTimeout(() => controller.abort(), 12000)
-      let response: Response
-      try {
-        response = await fetch(`${weatherUrl}?${params}`, { signal: controller.signal })
-      } finally {
-        window.clearTimeout(timeout)
+      const fetchWeatherSource = async (url: string) => {
+        const controller = new AbortController()
+        weatherRequestController.current = controller
+        const timeout = window.setTimeout(() => controller.abort(), 12000)
+        try {
+          return await fetch(url, { signal: controller.signal })
+        } finally {
+          window.clearTimeout(timeout)
+        }
       }
-      if (!response.ok) throw new Error('weather')
+      let response: Response | null = null
+      try {
+        response = await fetchWeatherSource(`${weatherUrl}?${params}`)
+      } catch {
+        if (requestId !== weatherRequestId.current) return
+      }
+      if (!response?.ok) {
+        if (requestId !== weatherRequestId.current) return
+        response = await fetchWeatherSource(`${weatherProxyUrl}?${proxyParams}`)
+      }
+      if (!response.ok) throw new Error(`weather status ${response.status}`)
       const nextWeather = await response.json() as WeatherData
       if (requestId !== weatherRequestId.current) return
       const timestamp = Date.now()
@@ -1512,7 +1528,7 @@ function App() {
                 : `${isWeatherOfflineCache ? 'Dados salvos para uso offline · ' : 'Estimativa · '}${weatherSourceLabel}${weatherDataTime ? ` · dado de ${weatherDataTime}` : ''} · consultado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
             </p>
           )}
-          {weather && <p className="weather-source-note">Os dados podem não refletir exatamente as condições locais.</p>}
+          <p className="weather-source-note">Os dados podem não refletir exatamente as condições locais.</p>
 
           {location ? (
             <div className="location-line">
@@ -1559,7 +1575,15 @@ function App() {
           )}
 
           {favoriteLocations.error && <div className="notice error"><AlertCircle size={16} /> {favoriteLocations.error}</div>}
-          {weatherError && <div className="notice error"><AlertCircle size={16} /> {weatherError}</div>}
+          {weatherError && (
+            <div className="notice error weather-error-notice" role="alert">
+              <AlertCircle size={16} />
+              <span>{weatherError}</span>
+              <button type="button" className="weather-retry-button" onClick={() => location && loadWeather(location, true)} disabled={loadingWeather}>
+                Tentar novamente
+              </button>
+            </div>
+          )}
           {loadingWeather && !weather && <div className="skeleton-block"><span /><span /><span /></div>}
 
           {weather && (
