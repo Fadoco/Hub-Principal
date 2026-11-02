@@ -50,13 +50,17 @@ test.beforeEach(async ({ page }) => {
       address: { city: 'Jundiaí', state: 'São Paulo', country: 'Brasil' },
     }],
   }))
+  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather**', (route) => route.fulfill({
+    status: 404,
+    json: { error: 'No recent station observation.' },
+  }))
   await page.route('https://economia.awesomeapi.com.br/**', (route) => route.fulfill({
     json: {
       USDBRL: { code: 'USD', name: 'Dólar', bid: '5.00', ask: '5.01', pctChange: '0.20', create_date: new Date().toISOString() },
       EURBRL: { code: 'EUR', name: 'Euro', bid: '5.50', ask: '5.51', pctChange: '0.10', create_date: new Date().toISOString() },
     },
   }))
-  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/**', (route) => route.fulfill({
+  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/news**', (route) => route.fulfill({
     contentType: 'application/rss+xml',
     body: `<rss><channel>${Array.from({ length: 7 }, (_, index) => `
       <item><title>Manchete de teste ${index + 1}</title><link>https://news.example/${index + 1}</link>
@@ -69,8 +73,9 @@ test.beforeEach(async ({ page }) => {
 test('starts with the weather panel and lazily loads the news tab', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Clima agora' })).toBeVisible()
   await expect(page.getByText('21°C')).toBeVisible()
-  await expect(page.locator('.weather-updated')).toContainText('Fonte: Open-Meteo · dado de 09:00')
-  await expect(page.locator('.weather-source-note')).toContainText('podem diferir do Google')
+  await expect(page.locator('.weather-updated')).toContainText('Estimativa · Open-Meteo · dado de 09:00')
+  await expect(page.locator('.weather-source-note')).toContainText('Os dados podem não refletir exatamente as condições locais.')
+  await expect(page.locator('.weather-station-fallback')).toContainText('Estação INMET indisponível')
   await expect(page.locator('.day-rain-time').first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Notícias', exact: true })).toHaveCount(0)
 
@@ -79,6 +84,26 @@ test('starts with the weather panel and lazily loads the news tab', async ({ pag
   await expect(page.getByRole('heading', { name: 'Portal de notícias de jogos' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => performance.getEntriesByType('resource')
     .some((resource) => resource.name.includes('/src/NewsPanel.tsx')))).toBe(true)
+})
+
+test('shows a nearby INMET observation alongside the Open-Meteo estimate', async ({ page }) => {
+  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather**', (route) => route.fulfill({
+    json: {
+      stationName: 'Barretos',
+      stationCode: 'A748',
+      state: 'SP',
+      temperatureC: 18,
+      observedAt: new Date().toISOString(),
+      distanceKm: 1.2,
+    },
+  }))
+  await page.reload()
+
+  await expect(page.locator('.temperature')).toContainText('18')
+  await expect(page.locator('.weather-updated')).toContainText('INMET · Barretos')
+  await expect(page.locator('.weather-comparison')).toContainText('Open-Meteo')
+  await expect(page.locator('.weather-comparison-difference')).toContainText('3°C')
+  await expect(page.locator('.weather-station-fallback')).toHaveCount(0)
 })
 
 test('explains that satellite HTTP 503 errors come from the INMET service', async ({ page }) => {

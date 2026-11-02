@@ -121,6 +121,14 @@ h2 { color: var(--ink); font-size: 21px; font-weight: 620; letter-spacing: -.025
 .source-badge { color: var(--teal); font-weight: 650; }
 .weather-updated { color: var(--muted); font-size: 11px; margin: -9px 0 16px; }
 .weather-source-note { color: var(--muted); font-size: 10px; line-height: 1.4; margin: -12px 0 16px; }
+.temperature-source { color: var(--muted); display: block; font-size: 10px; margin-top: 5px; }
+.weather-comparison {
+  color: var(--muted); display: grid; font-size: 10px; gap: 4px; line-height: 1.4;
+  margin: -13px 0 18px; overflow-wrap: anywhere;
+}
+.weather-comparison strong { color: var(--ink); }
+.weather-comparison-difference { color: #f4c96b !important; }
+.weather-station-fallback { color: var(--muted); font-size: 10px; line-height: 1.4; margin: -13px 0 18px; }
 .favorite-toggle, .favorite-location-remove {
   align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px;
   color: var(--muted); cursor: pointer; display: inline-flex; justify-content: center; transition: .18s;
@@ -973,11 +981,16 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
   .android-app.tv-mode .weather-panel > .section-heading { margin-bottom: 2px; }
   .android-app.tv-mode .weather-panel > .section-heading h2 { font-size: clamp(15px, 2vw, 18px); }
   .android-app.tv-mode .weather-updated { display: none; }
+  .android-app.tv-mode .weather-source-note,
+  .android-app.tv-mode .weather-comparison,
+  .android-app.tv-mode .weather-station-fallback { display: none; }
+  .android-app.tv-mode .temperature-source { display: none; }
   .android-app.tv-mode .location-line { margin-bottom: 4px; }
   .android-app.tv-mode .current-weather {
     align-items: center; flex-wrap: nowrap; gap: 8px; margin-bottom: 4px; min-height: 0; padding: 2px 8px;
   }
   .android-app.tv-mode .condition { font-size: 10px; }
+  .android-app.tv-mode .temperature-source { font-size: 8px; margin-top: 2px; }
   .android-app.tv-mode .feels {
     border-left: 1px solid rgba(190, 208, 231, .17); flex: 0 0 auto; font-size: 8px;
     margin-left: auto; padding-left: 7px; width: auto;

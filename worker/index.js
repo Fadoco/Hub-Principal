@@ -6,6 +6,10 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
 ]
 const FEED_CACHE_TTL_SECONDS = 300
+const STATION_WEATHER_CACHE_TTL_SECONDS = 900
+const STATION_LIST_CACHE_TTL_SECONDS = 86400
+const MAX_STATION_DISTANCE_KM = 100
+const MAX_OBSERVATION_AGE_MS = 2 * 60 * 60 * 1000
 
 function getAllowedOrigins(env) {
   return (env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(','))
@@ -38,6 +42,36 @@ function withCors(response, headers) {
   return new Response(response.body, { status: response.status, headers: responseHeaders })
 }
 
+function getDistanceKm(latitude1, longitude1, latitude2, longitude2) {
+  const radians = (degrees) => degrees * Math.PI / 180
+  const latitudeDifference = radians(latitude2 - latitude1)
+  const longitudeDifference = radians(longitude2 - longitude1)
+  const haversine = Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(radians(latitude1)) * Math.cos(radians(latitude2)) *
+    Math.sin(longitudeDifference / 2) ** 2
+  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+}
+
+function getUtcObservationHours(now) {
+  const currentHour = new Date(now)
+  currentHour.setUTCMinutes(0, 0, 0)
+  return Array.from({ length: 3 }, (_, index) => {
+    const date = new Date(currentHour.getTime() - index * 60 * 60 * 1000)
+    return {
+      date: date.toISOString().slice(0, 10),
+      hour: `${String(date.getUTCHours()).padStart(2, '0')}00`,
+      timestamp: date.getTime(),
+    }
+  })
+}
+
+function parseTemperature(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string' || value.trim() === '') return null
+  const parsed = Number(value.replace(',', '.'))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export default {
   async fetch(request, env, context) {
     const requestUrl = new URL(request.url)
@@ -55,6 +89,139 @@ export default {
     }
     if (requestUrl.pathname === '/health') {
       return jsonResponse({ status: 'ok' }, 200, headers)
+    }
+    if (requestUrl.pathname === '/weather') {
+      const latitudeValue = requestUrl.searchParams.get('latitude')
+      const longitudeValue = requestUrl.searchParams.get('longitude')
+      const latitude = Number(latitudeValue)
+      const longitude = Number(longitudeValue)
+      if (!latitudeValue || !longitudeValue ||
+          !Number.isFinite(latitude) || latitude < -34 || latitude > 6 ||
+          !Number.isFinite(longitude) || longitude < -75 || longitude > -32) {
+        return jsonResponse({ error: 'Coordinates must identify a location in Brazil.' }, 400, headers)
+      }
+      if (!env.INMET_TOKEN) {
+        return jsonResponse({ error: 'INMET station access is not configured.' }, 503, headers)
+      }
+
+      const latitudeKey = latitude.toFixed(2)
+      const longitudeKey = longitude.toFixed(2)
+      const responseCacheKey = new Request(`${requestUrl.origin}/__station-weather?latitude=${latitudeKey}&longitude=${longitudeKey}`)
+      const cachedWeather = await caches.default.match(responseCacheKey)
+      if (cachedWeather) return withCors(cachedWeather, headers)
+
+      const clientIp = request.headers.get('CF-Connecting-IP')
+      if (!clientIp) {
+        console.error('Cloudflare did not provide a client IP for station weather rate limiting.')
+        return jsonResponse({ error: 'Unable to verify request source.' }, 503, headers)
+      }
+      const { success } = await env.NEWS_RATE_LIMITER.limit({ key: clientIp })
+      if (!success) {
+        headers.set('Retry-After', '60')
+        return jsonResponse({ error: 'Too many requests. Please retry in one minute.' }, 429, headers)
+      }
+
+      try {
+        const stationListKey = new Request(`${requestUrl.origin}/__inmet-stations`)
+        let stationResponse = await caches.default.match(stationListKey)
+        if (!stationResponse) {
+          const upstreamStations = await fetch('https://apitempo.inmet.gov.br/estacoes/T', {
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(10000),
+          })
+          if (!upstreamStations.ok) {
+            console.error('INMET station catalog returned an unsuccessful status.', upstreamStations.status)
+            return jsonResponse({ error: 'INMET station data is temporarily unavailable.' }, 502, headers)
+          }
+          stationResponse = new Response(await upstreamStations.text(), {
+            headers: { 'Cache-Control': `public, max-age=${STATION_LIST_CACHE_TTL_SECONDS}` },
+          })
+          context.waitUntil(caches.default.put(stationListKey, stationResponse.clone()))
+        }
+
+        const stations = await stationResponse.json()
+        if (!Array.isArray(stations)) {
+          console.error('INMET station catalog returned an unexpected response.')
+          return jsonResponse({ error: 'INMET station data is temporarily unavailable.' }, 502, headers)
+        }
+
+        const nearbyStations = stations
+          .filter((station) => station.TP_ESTACAO === 'Automatica' &&
+            station.CD_SITUACAO === 'Operante' &&
+            typeof station.CD_ESTACAO === 'string' &&
+            typeof station.DC_NOME === 'string')
+          .map((station) => ({
+            ...station,
+            distanceKm: getDistanceKm(latitude, longitude, Number(station.VL_LATITUDE), Number(station.VL_LONGITUDE)),
+          }))
+          .filter((station) => Number.isFinite(station.distanceKm) && station.distanceKm <= MAX_STATION_DISTANCE_KM)
+          .sort((left, right) => left.distanceKm - right.distanceKm)
+
+        if (nearbyStations.length === 0) {
+          return jsonResponse({ error: 'No active INMET automatic station was found nearby.' }, 404, headers)
+        }
+
+        let observation = null
+        for (const observationHour of getUtcObservationHours(Date.now())) {
+          const upstreamUrl = `https://apitempo.inmet.gov.br/token/estacao/dados/${observationHour.date}/${observationHour.hour}/${encodeURIComponent(env.INMET_TOKEN)}`
+          const upstream = await fetch(upstreamUrl, {
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(10000),
+          })
+          if (!upstream.ok) {
+            console.error('INMET observations returned an unsuccessful status.', upstream.status)
+            return jsonResponse({ error: 'INMET station data is temporarily unavailable.' }, 502, headers)
+          }
+
+          const records = await upstream.json()
+          if (!Array.isArray(records)) {
+            console.error('INMET observations returned an unexpected response.')
+            return jsonResponse({ error: 'INMET station data is temporarily unavailable.' }, 502, headers)
+          }
+          const recordsByStation = new Map(records.map((record) => [record.CD_ESTACAO, record]))
+          const nearestReading = nearbyStations.find((station) => {
+            const record = recordsByStation.get(station.CD_ESTACAO)
+            return record && parseTemperature(record.TEM_INS) !== null
+          })
+          if (!nearestReading) continue
+
+          const record = recordsByStation.get(nearestReading.CD_ESTACAO)
+          const measurementDate = typeof record.DT_MEDICAO === 'string' ? record.DT_MEDICAO : observationHour.date
+          const measurementHour = typeof record.HR_MEDICAO === 'string'
+            ? record.HR_MEDICAO.slice(0, 2)
+            : observationHour.hour.slice(0, 2)
+          const measuredAt = Date.parse(`${measurementDate}T${measurementHour}:00:00Z`)
+          const observationAge = Date.now() - measuredAt
+          const temperature = parseTemperature(record.TEM_INS)
+          if (!Number.isFinite(measuredAt) ||
+              observationAge > MAX_OBSERVATION_AGE_MS ||
+              observationAge < -5 * 60 * 1000 ||
+              temperature === null || temperature < -50 || temperature > 60) continue
+
+          observation = {
+            stationName: nearestReading.DC_NOME,
+            stationCode: nearestReading.CD_ESTACAO,
+            state: nearestReading.SG_ESTADO || '',
+            temperatureC: temperature,
+            observedAt: new Date(measuredAt).toISOString(),
+            distanceKm: Math.round(nearestReading.distanceKm * 10) / 10,
+          }
+          break
+        }
+
+        if (!observation) {
+          return jsonResponse({ error: 'No recent temperature reading is available from nearby INMET stations.' }, 404, headers)
+        }
+
+        const weatherResponse = jsonResponse(observation, 200, new Headers({
+          'Cache-Control': `public, max-age=${STATION_WEATHER_CACHE_TTL_SECONDS}`,
+        }))
+        context.waitUntil(caches.default.put(responseCacheKey, weatherResponse.clone()))
+        return withCors(weatherResponse, headers)
+      } catch (error) {
+        console.error('Unable to retrieve recent INMET station observations.', error)
+        return jsonResponse({ error: 'INMET station data is temporarily unavailable.' }, 502, headers)
+      }
     }
     if (requestUrl.pathname !== '/news') {
       return jsonResponse({ error: 'Not found.' }, 404, headers)

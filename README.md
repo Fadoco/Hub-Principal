@@ -14,7 +14,7 @@ Clima, previsão do tempo, notícias e informações úteis em um só lugar. Use
 
 ## O que você encontra
 
-- **Clima e previsão:** condições atuais, próximas horas e previsão dos próximos dias, com chance e horário estimado do pico de chuva quando disponível. O app informa a fonte e o horário dos dados; valores podem diferir de outros serviços por diferenças de fonte, localização e atualização.
+- **Clima e previsão:** condições atuais, próximas horas e previsão dos próximos dias. Quando disponível, a temperatura observada em uma estação automática próxima do INMET é comparada com a estimativa do Open-Meteo. Os dados podem não refletir exatamente as condições locais.
 - **Satélite:** imagens meteorológicas recentes do INMET, com controles para animar e escolher os horários. Se o INMET retornar erro 503, o painel informa que a fonte do satélite está temporariamente indisponível, não que o app parou de funcionar.
 - **Notícias:** manchetes organizadas por assuntos, com links para abrir as fontes.
 - **Cotações:** valores de referência do dólar e do euro.
@@ -35,7 +35,7 @@ No computador, o site funciona no navegador. No Android, o app pode avisar quand
 O Hub reúne dados e serviços de terceiros. Consulte as fontes originais:
 
 - [Open-Meteo](https://open-meteo.com/) — dados meteorológicos e previsões.
-- [INMET](https://www.gov.br/inmet/pt-br) — imagens meteorológicas GOES; [visualizador de satélite](https://satelite.inmet.gov.br/).
+- [INMET](https://www.gov.br/inmet/pt-br) — observações meteorológicas e imagens GOES; [visualizador de satélite](https://satelite.inmet.gov.br/).
 - [OpenStreetMap](https://www.openstreetmap.org/copyright) e [Nominatim](https://nominatim.org/) — mapas e busca de cidades.
 - [AwesomeAPI](https://docs.awesomeapi.com.br/) — cotações de moedas.
 - [Bing Notícias](https://www.bing.com/news) — manchetes; [Google Notícias](https://news.google.com/) — buscas externas.

@@ -12,7 +12,7 @@ const getApiOrigins = (env: Record<string, string>) => {
     'https://hub-principal-news-api.hub-principal-fadoco.workers.dev',
   ])
 
-  for (const variable of ['VITE_WEATHER_API_URL', 'VITE_NEWS_API_URL']) {
+  for (const variable of ['VITE_WEATHER_API_URL', 'VITE_STATION_WEATHER_API_URL', 'VITE_NEWS_API_URL']) {
     const value = env[variable]?.trim()
     if (!value) continue
 

@@ -147,7 +147,9 @@ Importante: em produção no GitHub Pages, o navegador geralmente exige HTTPS ou
 ### 5.3 Clima e previsão
 Quando a localização se torna disponível, o componente dispara `loadWeather(location)`.
 
-A API usada é a Open-Meteo com parâmetros como:
+A Open-Meteo fornece previsão e métricas para as coordenadas escolhidas. Quando o Worker do projeto tem o secret `INMET_TOKEN` configurado, o app também consulta a leitura de temperatura recente da estação automática operante mais próxima, a até 100 km. A temperatura medida aparece como principal e a comparação com a estimativa do Open-Meteo é exibida na tela. Sem token, leitura recente ou estação próxima, o app mantém a estimativa do Open-Meteo como alternativa.
+
+A API usada para previsão é a Open-Meteo com parâmetros como:
 
 - latitude
 - longitude
@@ -176,7 +178,7 @@ Depois, a aplicação:
 - monta lista de previsão por horas e por dias;
 - atualiza automaticamente a cada 5 minutos por padrão.
 
-A interface informa o horário do dado enviado pela fonte e o horário da consulta. Os valores do Open-Meteo são estimativas para as coordenadas selecionadas e podem divergir de outros serviços por diferenças de localização, modelo e atualização; não devem ser interpretados como observação idêntica à do Google ou de uma estação local.
+A interface informa a fonte e o horário da leitura da estação, quando disponível, e compara esse valor com a estimativa do Open-Meteo. Os dados podem não refletir exatamente as condições locais; a estação pode ficar distante e as fontes podem diferir por localização, modelo e atualização.
 
 ### 5.4 Imagens de satélite
 O componente `SatellitePanel` busca no serviço de satélite do INMET as imagens GOES mais recentes sobre o Brasil, no produto Topo das Nuvens (T °C). A animação percorre os quadros da data mais recente, pré-carregando os próximos três quadros e mantendo até doze em cache para reduzir as pausas. Os controles ficam reduzidos a ícones de animação, atualização e tela cheia, sem exibir repetidamente mensagens de carregamento.
@@ -567,7 +569,7 @@ Antes de publicar uma nova versão Android, incremente `versionCode` e `versionN
 
 Como alternativa operacional, um APK assinado pode ser enviado pela interface web do GitHub para `updates/Hub-Principal.apk` e commitado na branch `main`. O workflow verifica o pacote, a assinatura, a versão e o SHA-256 contra o APK publicado; uma assinatura incompatível é rejeitada.
 
-### 17.5 Worker de notícias
+### 17.5 Worker de notícias e clima
 
 O frontend do GitHub Pages não pode ler feeds diretamente devido às políticas CORS. O Cloudflare Worker do projeto busca o RSS de notícias do Bing, valida a origem e a consulta, limita cada IP a 120 requisições por minuto e mantém cache por cinco minutos. O rate limit reduz abuso, mas não substitui proteção anti-DDoS. CORS controla quais páginas podem ler uma resposta no navegador; não autentica clientes nem impede chamadas automatizadas. O endpoint público padrão já é usado pelo app.
 
@@ -579,7 +581,15 @@ Para desenvolver ou substituir o Worker:
    npx wrangler login
    ```
 
-2. Publique o Worker:
+2. Para habilitar a temperatura observada do INMET, solicite o token de acesso aos dados de estações ao INMET pelo e-mail `cadastro.act@inmet.gov.br`. Configure-o diretamente como secret no Cloudflare; nunca use uma variável `VITE_*`, nem o envie no chat ou no repositório:
+
+   ```powershell
+   npx wrangler secret put INMET_TOKEN --config worker/wrangler.toml
+   ```
+
+   O app continuará usando a estimativa do Open-Meteo se o secret não estiver configurado ou não houver uma leitura recente próxima.
+
+3. Publique o Worker:
 
    ```powershell
    npm run deploy:news-api
@@ -587,13 +597,14 @@ Para desenvolver ou substituir o Worker:
 
    O Wrangler exibirá o endereço `workers.dev`; o endpoint de notícias termina em `/news`.
 
-3. Opcionalmente, configure outro endpoint compatível em `.env.local` (arquivo local não versionado):
+4. Opcionalmente, configure outros endpoints compatíveis em `.env.local` (arquivo local não versionado):
 
    ```text
    VITE_NEWS_API_URL=https://SEU-WORKER.workers.dev/news
+   VITE_STATION_WEATHER_API_URL=https://SEU-WORKER.workers.dev/weather
    ```
 
-4. Gere o build de Pages:
+5. Gere o build de Pages:
 
    ```powershell
    npm run build:pages
