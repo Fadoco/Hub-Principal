@@ -19,6 +19,7 @@ Clima, previsão do tempo, notícias e informações úteis em um só lugar. Use
 - **Notícias:** manchetes organizadas por assuntos, com links para abrir as fontes.
 - **Cotações:** valores de referência do dólar e do euro.
 - **Modo TV:** visualização ampliada de clima e satélite para telas maiores.
+- **Notificações do clima (Android):** resumo periódico da temperatura e da chance/horário de chuva. O intervalo é aproximado e pode ser adiado pelo Android.
 
 ## Como usar
 
@@ -27,6 +28,7 @@ Clima, previsão do tempo, notícias e informações úteis em um só lugar. Use
 3. No app, use a navegação inferior: **Início**, **Satélite**, **Notícias** e **Mais**.
 4. Toque em **Atualizar clima** para consultar as condições novamente. Os horários são exibidos no fuso local do dispositivo.
 5. Se ficar sem internet, alguns dados consultados anteriormente podem continuar disponíveis no aparelho.
+6. No app Android, abra **Mais → Notificações do clima**, escolha a cidade atual ou uma cidade favorita e ative os avisos. Use **Testar notificação** para conferir a aparência sem esperar o próximo envio. Permita as notificações quando o Android pedir. Os avisos não acompanham sua localização em segundo plano.
 
 No computador, o site funciona no navegador. No Android, o app pode avisar quando houver uma atualização disponível; você decide se deseja baixá-la e confirma a instalação.
 

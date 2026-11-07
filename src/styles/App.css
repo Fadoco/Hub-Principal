@@ -670,6 +670,7 @@ footer strong { color: var(--teal-dark); font-size: 11px; }
 .preference-size-options label, .preference-theme-options label { align-items: center; color: var(--ink); display: inline-flex; font-size: 11px; gap: 7px; }
 .preference-size-options input, .preference-theme-options input { accent-color: var(--teal); height: 16px; width: 16px; }
 .preference-reset-description { border-top: 1px solid var(--line); margin-top: 2px; padding-top: 12px; }
+.weather-notification-message { color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 10px; }
 .preference-reset-button { align-items: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 10px; color: var(--teal-dark); cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 700; gap: 8px; justify-content: center; margin-top: 10px; min-height: 42px; padding: 0 14px; }
 .preference-reset-button:active { transform: scale(.98); }
 .preference-storage-error, .preferences-empty-state { background: rgba(255, 143, 143, .1); border: 1px solid rgba(255, 143, 143, .25); border-radius: 12px; color: #ffd0d2; font-size: 11px; line-height: 1.5; padding: 12px; }

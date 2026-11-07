@@ -114,6 +114,12 @@ Esses estados são atualizados por `useEffect`, que fazem a aplicação reagir a
 
 ## 5. Fluxo do funcionamento do site
 
+### Notificações meteorológicas do APK
+
+As notificações são exclusivas do aplicativo Android e são configuradas em **Mais → Notificações do clima**. O usuário pode escolher a cidade atual ou uma cidade favorita, ativar/desativar os avisos e autorizar as notificações. O botão **Testar notificação** exibe um exemplo local imediatamente, mesmo que o envio periódico esteja desativado. A permissão é solicitada ao ativar ou testar; se for negada, há um atalho para as configurações de notificações do Android.
+
+O app salva no armazenamento nativo as coordenadas e o nome da cidade escolhida. A opção “Cidade atual” acompanha o local selecionado na tela do clima; outras cidades podem ser usadas após serem salvas como favoritas. O WorkManager consulta a previsão do Open-Meteo e publica uma notificação com a temperatura atual e a maior probabilidade de chuva nas próximas 24 horas. A tarefa periódica tem intervalo configurado de 30 minutos, mas o Android pode atrasá-la por economia de bateria, modo Doze, falta de rede ou outras restrições do sistema. Uma consulta inicial também é agendada ao ativar o recurso. Não é solicitada localização em segundo plano e a localização não é rastreada continuamente. O site não registra nem solicita essa permissão.
+
 ### 5.1 Relógio e data
 No topo do painel, o site exibe:
 

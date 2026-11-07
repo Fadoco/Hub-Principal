@@ -81,6 +81,15 @@ test('starts with the weather panel and lazily loads the news tab', async ({ pag
     .some((resource) => resource.name.includes('/src/NewsPanel.tsx')))).toBe(true)
 })
 
+test('keeps native weather notifications out of the web preview', async ({ page }) => {
+  await page.getByRole('button', { name: 'Mais' }).click()
+  await page.getByRole('button', { name: 'Personalização' }).click()
+  await expect(page.getByText('Resumo do clima')).toHaveCount(0)
+  await expect(page.getByText('Enviar resumo do clima')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Notificações do clima/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Testar notificação' })).toHaveCount(0)
+})
+
 test('does not request INMET station data for the weather panel', async ({ page }) => {
   let stationRequests = 0
   await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather**', (route) => {

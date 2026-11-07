@@ -13,6 +13,12 @@ import {
   isAndroidApp,
   type AndroidUpdate,
 } from './androidUpdate'
+import {
+  configureWeatherNotifications,
+  openWeatherNotificationSettings,
+  requestWeatherNotificationPermission,
+  showTestWeatherNotification,
+} from './weatherNotifications'
 
 type Coordinates = { latitude: number; longitude: number }
 type LocationInfo = Coordinates & { city: string; state: string; country: string }
@@ -35,6 +41,8 @@ type MobileTheme = 'original' | 'dark' | 'light'
 type SiteTheme = 'original' | 'dark' | 'light'
 type MobilePreferences = {
   rainAlerts: boolean
+  weatherNotifications: boolean
+  weatherNotificationLocation: LocationInfo | null
   visibleMetrics: WeatherMetricId[]
   metricOrder: WeatherMetricId[]
   newsCategories: NewsCategoryId[]
@@ -99,6 +107,8 @@ const newsCategoryOptions: Array<{ id: NewsCategoryId; label: string }> = [
 ]
 const defaultMobilePreferences: MobilePreferences = {
   rainAlerts: true,
+  weatherNotifications: false,
+  weatherNotificationLocation: null,
   visibleMetrics: defaultMetricOrder.slice(0, 4),
   metricOrder: defaultMetricOrder,
   newsCategories: newsCategoryOptions.map(({ id }) => id),
@@ -177,6 +187,8 @@ const readMobilePreferences = () => {
     return {
       value: {
         rainAlerts: typeof value.rainAlerts === 'boolean' ? value.rainAlerts : defaultMobilePreferences.rainAlerts,
+        weatherNotifications: typeof value.weatherNotifications === 'boolean' ? value.weatherNotifications : defaultMobilePreferences.weatherNotifications,
+        weatherNotificationLocation: isLocationInfo(value.weatherNotificationLocation) ? value.weatherNotificationLocation : null,
         visibleMetrics,
         metricOrder,
         newsCategories,
@@ -551,6 +563,11 @@ function App() {
   const mobilePreferencesRef = useRef(mobilePreferenceState.value)
   const [isCityModalOpen, setIsCityModalOpen] = useState(false)
   const [isPersonalizationOpen, setIsPersonalizationOpen] = useState(false)
+  const [isWeatherNotificationSettingsOpen, setIsWeatherNotificationSettingsOpen] = useState(false)
+  const [weatherNotificationMessage, setWeatherNotificationMessage] = useState('')
+  const [weatherNotificationPermissionDenied, setWeatherNotificationPermissionDenied] = useState(false)
+  const [isUpdatingWeatherNotifications, setIsUpdatingWeatherNotifications] = useState(false)
+  const [isSendingTestWeatherNotification, setIsSendingTestWeatherNotification] = useState(false)
   const [isTvMode, setIsTvMode] = useState(false)
   const [tvModeError, setTvModeError] = useState('')
   const [cityQuery, setCityQuery] = useState('')
@@ -568,6 +585,21 @@ function App() {
   const dismissedUpdateVersion = useRef<string | null>(null)
   const isAndroidApplication = isAndroidApp() || isAndroidPreview
   const mobilePreferences = mobilePreferenceState.value
+  const savedWeatherNotificationLocation = mobilePreferences.weatherNotificationLocation
+  const hasSavedWeatherNotificationLocation = Boolean(savedWeatherNotificationLocation && (
+    (location && getLocationKey(savedWeatherNotificationLocation) === getLocationKey(location)) ||
+    favoriteLocations.items.some((favorite) => getLocationKey(favorite) === getLocationKey(savedWeatherNotificationLocation))
+  ))
+  const weatherNotificationLocation = savedWeatherNotificationLocation || location
+  const weatherNotificationLocationOptions = [
+    ...(location ? [{ location, label: `Cidade atual — ${location.city}, ${location.state}` }] : []),
+    ...favoriteLocations.items
+      .filter((favorite) => !location || getLocationKey(favorite) !== getLocationKey(location))
+      .map((favorite) => ({ location: favorite, label: `Favorita — ${favorite.city}, ${favorite.state}` })),
+    ...(savedWeatherNotificationLocation && !hasSavedWeatherNotificationLocation
+      ? [{ location: savedWeatherNotificationLocation, label: `Selecionada — ${savedWeatherNotificationLocation.city}, ${savedWeatherNotificationLocation.state}` }]
+      : []),
+  ]
   const syncMobileHeaderCompact = useCallback((header: HTMLElement | null) => {
     if (!header) return
     const scrollContainer = header.closest('.android-app')
@@ -582,6 +614,17 @@ function App() {
     const timer = window.setInterval(() => setNow(new Date()), 60000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!isAndroidApp()) return
+    void configureWeatherNotifications({
+      enabled: mobilePreferences.weatherNotifications,
+      location: weatherNotificationLocation,
+    }).catch((error: unknown) => {
+      console.error('Não foi possível sincronizar as notificações meteorológicas.', error)
+      setWeatherNotificationMessage('Não foi possível atualizar as notificações. Tente novamente.')
+    })
+  }, [weatherNotificationLocation, mobilePreferences.weatherNotifications])
 
   useEffect(() => {
     const updateOnlineStatus = () => setIsOnline(navigator.onLine)
@@ -675,6 +718,65 @@ function App() {
       setMobilePreferenceState((current) => ({ ...current, error: 'Não foi possível salvar as preferências neste aplicativo.' }))
     }
   }, [])
+
+  const toggleWeatherNotifications = async (enabled: boolean) => {
+    setWeatherNotificationMessage('')
+    setWeatherNotificationPermissionDenied(false)
+    if (enabled && !weatherNotificationLocation) {
+      setWeatherNotificationMessage('Escolha uma cidade ou permita a localização no app antes de ativar os avisos.')
+      return
+    }
+
+    setIsUpdatingWeatherNotifications(true)
+    try {
+      if (enabled) {
+        const permission = await requestWeatherNotificationPermission()
+        if (!permission.granted) {
+          setWeatherNotificationPermissionDenied(true)
+          setWeatherNotificationMessage('Permita notificações do Hub Principal nas configurações do Android para ativar os avisos.')
+          return
+        }
+      }
+
+      await configureWeatherNotifications({ enabled, location: weatherNotificationLocation })
+      updateMobilePreferences({ weatherNotifications: enabled })
+      setWeatherNotificationMessage(enabled
+        ? 'Avisos ativados. O Android pode variar o intervalo de cerca de 30 minutos.'
+        : 'Avisos desativados.')
+    } catch (error) {
+      console.error('Não foi possível alterar as notificações meteorológicas.', error)
+      setWeatherNotificationMessage('Não foi possível alterar os avisos. Verifique as permissões e tente novamente.')
+    } finally {
+      setIsUpdatingWeatherNotifications(false)
+    }
+  }
+
+  const sendTestWeatherNotification = async () => {
+    setWeatherNotificationMessage('')
+    setWeatherNotificationPermissionDenied(false)
+    if (!weatherNotificationLocation) {
+      setWeatherNotificationMessage('Escolha uma cidade antes de testar a notificação.')
+      return
+    }
+
+    setIsSendingTestWeatherNotification(true)
+    try {
+      const permission = await requestWeatherNotificationPermission()
+      if (!permission.granted) {
+        setWeatherNotificationPermissionDenied(true)
+        setWeatherNotificationMessage('Permita notificações do Hub Principal nas configurações do Android para fazer o teste.')
+        return
+      }
+
+      await showTestWeatherNotification(weatherNotificationLocation)
+      setWeatherNotificationMessage('Notificação de teste enviada. Confira a área de notificações do aparelho.')
+    } catch (error) {
+      console.error('Não foi possível enviar a notificação de teste.', error)
+      setWeatherNotificationMessage('Não foi possível enviar a notificação de teste. Verifique as permissões e tente novamente.')
+    } finally {
+      setIsSendingTestWeatherNotification(false)
+    }
+  }
 
   useEffect(() => {
     if (!draggedMetric) return
@@ -1673,11 +1775,13 @@ function App() {
       {isAndroidApplication && activeMobileTab === 'more' && (
         <section className="mobile-tab-content mobile-more-screen">
           <div className="mobile-view-heading">
-            <span className="section-kicker">{isPersonalizationOpen ? 'PREFERÊNCIAS' : 'APLICATIVO'}</span>
-            <h2>{isPersonalizationOpen ? 'Personalização' : 'Mais'}</h2>
-            <p>{isPersonalizationOpen ? 'Ajuste o clima, as notícias e a leitura do seu jeito.' : 'Atalhos, informações e atualizações do aplicativo.'}</p>
+            <span className="section-kicker">{isPersonalizationOpen || isWeatherNotificationSettingsOpen ? 'PREFERÊNCIAS' : 'APLICATIVO'}</span>
+            <h2>{isWeatherNotificationSettingsOpen ? 'Notificações do clima' : isPersonalizationOpen ? 'Personalização' : 'Mais'}</h2>
+            <p>{isWeatherNotificationSettingsOpen
+              ? 'Escolha o que será enviado e para qual cidade.'
+              : isPersonalizationOpen ? 'Ajuste o clima, as notícias e a leitura do seu jeito.' : 'Atalhos, informações e atualizações do aplicativo.'}</p>
           </div>
-          {!isPersonalizationOpen && <button
+          {!isPersonalizationOpen && !isWeatherNotificationSettingsOpen && <button
             className="mobile-tv-toggle"
             type="button"
             onClick={() => void toggleAndroidTvMode(!isTvMode)}
@@ -1689,19 +1793,84 @@ function App() {
               <small>{isTvMode ? 'Voltar à visualização normal' : 'Clima e satélite em tela ampliada'}</small>
             </span>
           </button>}
-          {!isPersonalizationOpen && (
+          {!isPersonalizationOpen && !isWeatherNotificationSettingsOpen && isAndroidApp() && (
+            <button className="mobile-personalize-button" type="button" onClick={() => setIsWeatherNotificationSettingsOpen(true)}>
+              <Umbrella size={20} />
+              <span><strong>Notificações do clima</strong><small>Escolha a cidade e ative os avisos</small></span>
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          {!isPersonalizationOpen && !isWeatherNotificationSettingsOpen && (
             <button className="mobile-personalize-button" type="button" onClick={() => setIsPersonalizationOpen(true)}>
               <Settings2 size={20} />
               <span><strong>Personalização</strong><small>Alertas, cartões, notícias e acessibilidade</small></span>
               <ChevronLeft size={18} />
             </button>
           )}
-          {isPersonalizationOpen && (
-            <button className="mobile-personalization-back" type="button" onClick={() => setIsPersonalizationOpen(false)}>
+          {(isPersonalizationOpen || isWeatherNotificationSettingsOpen) && (
+            <button className="mobile-personalization-back" type="button" onClick={() => {
+              setIsPersonalizationOpen(false)
+              setIsWeatherNotificationSettingsOpen(false)
+            }}>
               <ChevronLeft size={18} />
               Voltar
             </button>
           )}
+          {isWeatherNotificationSettingsOpen && isAndroidApp() && <section className="mobile-preferences-card">
+              <div className="preferences-card-heading">
+                <span className="section-kicker">NOTIFICAÇÕES DO ANDROID</span>
+                <h3>Resumo do clima</h3>
+                <p>Receba a temperatura, a chance de chuva e o horário de maior probabilidade. O Android atualiza em intervalos aproximados de 30 minutos.</p>
+              </div>
+              <fieldset className="preference-theme-options">
+                <legend>Cidade das notificações</legend>
+                {weatherNotificationLocationOptions.map(({ location: optionLocation, label }) => (
+                  <label key={getLocationKey(optionLocation)}>
+                    <input
+                      type="radio"
+                      name="weather-notification-location"
+                      checked={Boolean(weatherNotificationLocation && getLocationKey(weatherNotificationLocation) === getLocationKey(optionLocation))}
+                      onChange={() => updateMobilePreferences({
+                        weatherNotificationLocation: location && getLocationKey(location) === getLocationKey(optionLocation)
+                          ? null
+                          : optionLocation,
+                      })}
+                    />
+                    {label}
+                  </label>
+                ))}
+                {!weatherNotificationLocationOptions.length && <p className="weather-notification-message">Escolha uma cidade no app ou salve uma cidade favorita para usá-la aqui.</p>}
+                <p className="weather-notification-message">A opção “Cidade atual” acompanha o local selecionado na tela do clima. Para adicionar outras cidades, pesquise no clima e salve-as como favoritas.</p>
+              </fieldset>
+              <label className="preference-toggle-row">
+                <span>Enviar resumo do clima</span>
+                <input
+                  type="checkbox"
+                  checked={mobilePreferences.weatherNotifications}
+                  disabled={isUpdatingWeatherNotifications || !weatherNotificationLocation}
+                  onChange={(event) => void toggleWeatherNotifications(event.target.checked)}
+                />
+              </label>
+              <button
+                className="preference-reset-button"
+                type="button"
+                onClick={() => void sendTestWeatherNotification()}
+                disabled={isSendingTestWeatherNotification || !weatherNotificationLocation}
+              >
+                {isSendingTestWeatherNotification ? 'Enviando teste...' : 'Testar notificação'}
+              </button>
+              {weatherNotificationMessage && <p className="weather-notification-message" role="status">{weatherNotificationMessage}</p>}
+              {weatherNotificationPermissionDenied && <button
+                className="preference-reset-button"
+                type="button"
+                onClick={() => void openWeatherNotificationSettings().catch((error: unknown) => {
+                  console.error('Não foi possível abrir as configurações de notificações.', error)
+                  setWeatherNotificationMessage('Não foi possível abrir as configurações do Android. Acesse as permissões do Hub Principal nas configurações do aparelho.')
+                })}
+              >
+                Permitir nas configurações do Android
+              </button>}
+          </section>}
           {isPersonalizationOpen && <section className="mobile-preferences-card">
             <div className="preferences-card-heading">
               <span className="section-kicker">CLIMA E ALERTAS</span>
@@ -1792,14 +1961,14 @@ function App() {
             </button>
           </section>}
           {isPersonalizationOpen && mobilePreferenceState.error && <p className="preference-storage-error" role="alert">{mobilePreferenceState.error}</p>}
-          {!isPersonalizationOpen && <PersonalSites />}
-          {!isPersonalizationOpen && <section className="mobile-about-card">
+          {!isPersonalizationOpen && !isWeatherNotificationSettingsOpen && <PersonalSites />}
+          {!isPersonalizationOpen && !isWeatherNotificationSettingsOpen && <section className="mobile-about-card">
             <span className="section-kicker">SOBRE O APLICATIVO</span>
             <h3>Hub Principal</h3>
             <p>Versão {installedAndroidAppVersion || 'verificando...'}</p>
             <p className="mobile-data-status">{isOnline ? 'Conectado à internet' : 'Sem conexão com a internet'}</p>
           </section>}
-          {!isPersonalizationOpen && <div className="app-update-panel" aria-live="polite">
+          {!isPersonalizationOpen && !isWeatherNotificationSettingsOpen && <div className="app-update-panel" aria-live="polite">
             <div className="mobile-update-heading">
               <div><span className="section-kicker">ATUALIZAÇÕES</span><h3>Atualização do app</h3></div>
               <span className="mobile-auto-update">Automática</span>
@@ -1845,6 +2014,7 @@ function App() {
               onClick={() => {
                 setActiveMobileTab(id)
                 setIsPersonalizationOpen(false)
+                setIsWeatherNotificationSettingsOpen(false)
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               aria-current={activeMobileTab === id ? 'page' : undefined}

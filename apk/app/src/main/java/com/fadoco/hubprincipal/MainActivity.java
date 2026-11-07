@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppUpdatePlugin.class);
         registerPlugin(AndroidTvModePlugin.class);
+        registerPlugin(WeatherNotificationsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
