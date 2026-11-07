@@ -28,14 +28,6 @@ type CitySuggestion = {
 }
 type WeatherData = { current: Record<string, number | string>; hourly: { time: string[]; temperature_2m: number[]; precipitation: number[]; precipitation_probability: number[]; weather_code: number[] }; daily: { time: string[]; weather_code: number[]; precipitation_probability_max: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; sunrise: string[]; sunset: string[] } }
 type WeatherCache = { weather: WeatherData }
-type StationWeatherObservation = {
-  stationName: string
-  stationCode: string
-  state: string
-  temperatureC: number
-  observedAt: string
-  distanceKm: number
-}
 type PersonalSite = { name: string; url: string }
 type WeatherMetricId = 'humidity' | 'wind' | 'pressure' | 'precipitation' | 'visibility' | 'sunrise' | 'sunset' | 'uv' | 'clouds'
 type NewsCategoryId = 'local' | 'games' | 'films' | 'anime' | 'geek' | 'global'
@@ -51,8 +43,7 @@ type MobilePreferences = {
 }
 const weatherUrl = import.meta.env.VITE_WEATHER_API_URL || 'https://api.open-meteo.com/v1/forecast'
 const weatherSourceLabel = weatherUrl.includes('api.open-meteo.com') ? 'Open-Meteo' : 'serviço meteorológico configurado'
-const stationWeatherUrl = import.meta.env.VITE_STATION_WEATHER_API_URL || 'https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather'
-const weatherProxyUrl = `${new URL(stationWeatherUrl).origin}/forecast`
+const weatherProxyUrl = 'https://hub-principal-news-api.hub-principal-fadoco.workers.dev/forecast'
 const WEATHER_CACHE_TTL = 180000
 const WEATHER_OFFLINE_CACHE_TTL = 24 * 60 * 60 * 1000
 const CurrencyPanel = lazy(() => import('./CurrencyPanel'))
@@ -151,18 +142,6 @@ const isWeatherData = (value: unknown): value is WeatherData => {
   return Boolean(weather.current && typeof weather.current === 'object'
     && weather.hourly && Array.isArray(weather.hourly.time)
     && weather.daily && Array.isArray(weather.daily.time))
-}
-const isStationWeatherObservation = (value: unknown): value is StationWeatherObservation => {
-  if (!value || typeof value !== 'object') return false
-  const observation = value as Partial<StationWeatherObservation>
-  return typeof observation.stationName === 'string' &&
-    typeof observation.stationCode === 'string' &&
-    typeof observation.state === 'string' &&
-    typeof observation.temperatureC === 'number' && Number.isFinite(observation.temperatureC) &&
-    observation.temperatureC >= -50 && observation.temperatureC <= 60 &&
-    typeof observation.observedAt === 'string' && Number.isFinite(Date.parse(observation.observedAt)) &&
-    typeof observation.distanceKm === 'number' && Number.isFinite(observation.distanceKm) &&
-    observation.distanceKm >= 0 && observation.distanceKm <= 100
 }
 const readFavoriteLocations = (): FavoriteLocationsState => {
   try {
@@ -549,15 +528,11 @@ function App() {
   const pullStartY = useRef<number | null>(null)
   const weatherRequestId = useRef(0)
   const weatherRequestController = useRef<AbortController | null>(null)
-  const stationRequestId = useRef(0)
-  const stationRequestController = useRef<AbortController | null>(null)
   const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(previewLocation)
   const [location, setLocation] = useState<LocationInfo | null>(previewLocation)
   const [locationError, setLocationError] = useState('')
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [weatherError, setWeatherError] = useState('')
-  const [stationObservation, setStationObservation] = useState<StationWeatherObservation | null>(null)
-  const [stationObservationError, setStationObservationError] = useState('')
   const [isWeatherOfflineCache, setIsWeatherOfflineCache] = useState(false)
   const [loadingWeather, setLoadingWeather] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -832,13 +807,8 @@ function App() {
       weatherRequestId.current += 1
       weatherRequestController.current?.abort()
       weatherRequestController.current = null
-      stationRequestId.current += 1
-      stationRequestController.current?.abort()
-      stationRequestController.current = null
       setWeather(null)
       setWeatherError('')
-      setStationObservation(null)
-      setStationObservationError('')
       setLastUpdated(null)
       setIsWeatherOfflineCache(false)
     }
@@ -1115,43 +1085,7 @@ function App() {
     }
   }
 
-  const loadStationObservation = async (coordinates: Coordinates) => {
-    const requestId = ++stationRequestId.current
-    stationRequestController.current?.abort()
-    const controller = new AbortController()
-    stationRequestController.current = controller
-    setStationObservationError('')
-    try {
-      const params = new URLSearchParams({
-        latitude: String(coordinates.latitude),
-        longitude: String(coordinates.longitude),
-      })
-      const timeout = window.setTimeout(() => controller.abort(), 12000)
-      let response: Response
-      let result: unknown
-      try {
-        response = await fetch(`${stationWeatherUrl}?${params}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-        if (!response.ok) throw new Error(`INMET status ${response.status}`)
-        result = await response.json()
-      } finally {
-        window.clearTimeout(timeout)
-      }
-      if (!isStationWeatherObservation(result)) throw new Error('Resposta inválida da estação INMET.')
-      if (requestId === stationRequestId.current) setStationObservation(result)
-    } catch (error) {
-      if (requestId !== stationRequestId.current) return
-      setStationObservation(null)
-      setStationObservationError(error instanceof Error ? error.message : 'Estação INMET indisponível.')
-    } finally {
-      if (requestId === stationRequestId.current) stationRequestController.current = null
-    }
-  }
-
   const loadWeather = async (coordinates: Coordinates, forceRefresh = false) => {
-    void loadStationObservation(coordinates)
     const requestId = ++weatherRequestId.current
     weatherRequestController.current?.abort()
     weatherRequestController.current = null
@@ -1162,10 +1096,13 @@ function App() {
     const cachedWeather = cached && isWeatherData(cached.value.weather)
       ? { weather: cached.value.weather, timestamp: cached.timestamp }
       : null
-    if (!navigator.onLine && cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_OFFLINE_CACHE_TTL) {
+    const cacheAge = cachedWeather ? Date.now() - cachedWeather.timestamp : Infinity
+    if (cachedWeather && cacheAge < WEATHER_OFFLINE_CACHE_TTL) {
       setWeather(cachedWeather.weather)
       setLastUpdated(new Date(cachedWeather.timestamp))
-      setIsWeatherOfflineCache(true)
+      setIsWeatherOfflineCache(!navigator.onLine)
+    }
+    if (!navigator.onLine && cachedWeather && cacheAge < WEATHER_OFFLINE_CACHE_TTL) {
       setLoadingWeather(false)
       return
     }
@@ -1183,10 +1120,7 @@ function App() {
         latitude: String(coordinates.latitude),
         longitude: String(coordinates.longitude),
       })
-      if (!forceRefresh && cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_CACHE_TTL) {
-        setWeather(cachedWeather.weather)
-        setLastUpdated(new Date(cachedWeather.timestamp))
-        setIsWeatherOfflineCache(false)
+      if (!forceRefresh && cachedWeather && cacheAge < WEATHER_CACHE_TTL) {
         setLoadingWeather(false)
         return
       }
@@ -1224,8 +1158,10 @@ function App() {
       if (cachedWeather && Date.now() - cachedWeather.timestamp < WEATHER_OFFLINE_CACHE_TTL) {
         setWeather(cachedWeather.weather)
         setLastUpdated(new Date(cachedWeather.timestamp))
-        setIsWeatherOfflineCache(true)
-        setWeatherError('')
+        setIsWeatherOfflineCache(!navigator.onLine)
+        setWeatherError(navigator.onLine
+          ? 'Não foi possível atualizar. Mostrando os últimos dados salvos; tente novamente em instantes.'
+          : '')
       } else {
         setWeatherError('Não foi possível atualizar os dados meteorológicos. Tentaremos novamente automaticamente.')
       }
@@ -1240,8 +1176,6 @@ function App() {
   useEffect(() => () => {
     weatherRequestId.current += 1
     weatherRequestController.current?.abort()
-    stationRequestId.current += 1
-    stationRequestController.current?.abort()
   }, [])
   useEffect(() => {
     if (!location) return
@@ -1262,10 +1196,7 @@ function App() {
 
   const current = weather?.current
   const currentCode = Number(current?.weather_code || 0)
-  const displayedTemperature = stationObservation?.temperatureC ?? current?.temperature_2m
-  const stationObservedTime = stationObservation
-    ? formatTime(stationObservation.observedAt)
-    : null
+  const displayedTemperature = current?.temperature_2m
   const weatherDataTime = typeof current?.time === 'string' && /^\d{2}:\d{2}$/.test(current.time.slice(11, 16))
     ? current.time.slice(11, 16)
     : null
@@ -1523,9 +1454,7 @@ function App() {
 
           {weather && lastUpdated && (
             <p className="weather-updated" aria-live="polite">
-              {stationObservation
-                ? `INMET · ${stationObservation.stationName} · leitura às ${stationObservedTime}`
-                : `${isWeatherOfflineCache ? 'Dados salvos para uso offline · ' : 'Estimativa · '}${weatherSourceLabel}${weatherDataTime ? ` · dado de ${weatherDataTime}` : ''} · consultado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+              {`${isWeatherOfflineCache ? 'Dados salvos para uso offline · ' : `${weatherSourceLabel} · `}${weatherDataTime ? `dado de ${weatherDataTime}` : ''} · atualizado às ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
             </p>
           )}
           <p className="weather-source-note">Os dados podem não refletir exatamente as condições locais.</p>
@@ -1602,34 +1531,10 @@ function App() {
                 <div>
                   <div className="temperature">{formatNumber(displayedTemperature, '°')}<span>C</span></div>
                   <div className="condition">{weatherLabels[currentCode] || 'Condição atual'}</div>
-                  <small className="temperature-source">
-                    {stationObservation
-                      ? `${stationObservation.stationName} · INMET`
-                      : `Estimativa · ${weatherSourceLabel}`}
-                  </small>
+                  <small className="temperature-source">{weatherSourceLabel}</small>
                 </div>
                 <div className="feels">Sensação<br /><strong>{formatNumber(current?.apparent_temperature, '°')}C</strong></div>
               </div>
-              {stationObservation && typeof current?.temperature_2m === 'number' && (
-                <div className="weather-comparison" aria-label="Comparação entre temperatura observada e estimada">
-                  <span>
-                    INMET · {stationObservation.stationName}: <strong>{formatNumber(stationObservation.temperatureC, '°')}C</strong>
-                    {` · ${stationObservedTime} · ${stationObservation.distanceKm.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`}
-                  </span>
-                  <span>
-                    {weatherSourceLabel}: <strong>{formatNumber(current.temperature_2m, '°')}C</strong>
-                    {weatherDataTime ? ` · ${weatherDataTime}` : ' · estimativa'}
-                  </span>
-                  {Math.abs(stationObservation.temperatureC - current.temperature_2m) >= 3 && (
-                    <strong className="weather-comparison-difference">
-                      As fontes diferem em {formatNumber(Math.abs(stationObservation.temperatureC - current.temperature_2m), '°C')}.
-                    </strong>
-                  )}
-                </div>
-              )}
-              {!stationObservation && stationObservationError && (
-                <p className="weather-station-fallback">Estação INMET indisponível; mostrando estimativa do Open-Meteo.</p>
-              )}
 
               <div className="tv-weather-rain">
                 <CloudRain size={21} />

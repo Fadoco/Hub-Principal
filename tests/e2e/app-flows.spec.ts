@@ -50,10 +50,6 @@ test.beforeEach(async ({ page }) => {
       address: { city: 'Jundiaí', state: 'São Paulo', country: 'Brasil' },
     }],
   }))
-  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather**', (route) => route.fulfill({
-    status: 404,
-    json: { error: 'No recent station observation.' },
-  }))
   await page.route('https://economia.awesomeapi.com.br/**', (route) => route.fulfill({
     json: {
       USDBRL: { code: 'USD', name: 'Dólar', bid: '5.00', ask: '5.01', pctChange: '0.20', create_date: new Date().toISOString() },
@@ -73,9 +69,8 @@ test.beforeEach(async ({ page }) => {
 test('starts with the weather panel and lazily loads the news tab', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Clima agora' })).toBeVisible()
   await expect(page.getByText('21°C')).toBeVisible()
-  await expect(page.locator('.weather-updated')).toContainText('Estimativa · Open-Meteo · dado de 09:00')
+  await expect(page.locator('.weather-updated')).toContainText('Open-Meteo · dado de 09:00')
   await expect(page.locator('.weather-source-note')).toContainText('Os dados podem não refletir exatamente as condições locais.')
-  await expect(page.locator('.weather-station-fallback')).toContainText('Estação INMET indisponível')
   await expect(page.locator('.day-rain-time').first()).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Notícias', exact: true })).toHaveCount(0)
 
@@ -86,24 +81,34 @@ test('starts with the weather panel and lazily loads the news tab', async ({ pag
     .some((resource) => resource.name.includes('/src/NewsPanel.tsx')))).toBe(true)
 })
 
-test('shows a nearby INMET observation alongside the Open-Meteo estimate', async ({ page }) => {
-  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather**', (route) => route.fulfill({
-    json: {
-      stationName: 'Barretos',
-      stationCode: 'A748',
-      state: 'SP',
-      temperatureC: 18,
-      observedAt: new Date().toISOString(),
-      distanceKm: 1.2,
-    },
-  }))
+test('does not request INMET station data for the weather panel', async ({ page }) => {
+  let stationRequests = 0
+  await page.route('https://hub-principal-news-api.hub-principal-fadoco.workers.dev/weather**', (route) => {
+    stationRequests += 1
+    return route.fulfill({ status: 404 })
+  })
+  await page.reload()
+  await expect(page.locator('.temperature')).toContainText('21')
+  expect(stationRequests).toBe(0)
+})
+
+test('shows saved weather immediately while fetching a fresh forecast', async ({ page }) => {
+  const cachedWeather = {
+    ...weatherResponse,
+    current: { ...weatherResponse.current, temperature_2m: 17 },
+  }
+  await page.evaluate((weather) => localStorage.setItem('hub-weather-v4:-23.550:-46.630', JSON.stringify({
+    timestamp: Date.now() - 10 * 60_000,
+    value: { weather },
+  })), cachedWeather)
+  await page.route('https://api.open-meteo.com/**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+    await route.fulfill({ json: weatherResponse })
+  })
   await page.reload()
 
-  await expect(page.locator('.temperature')).toContainText('18')
-  await expect(page.locator('.weather-updated')).toContainText('INMET · Barretos')
-  await expect(page.locator('.weather-comparison')).toContainText('Open-Meteo')
-  await expect(page.locator('.weather-comparison-difference')).toContainText('3°C')
-  await expect(page.locator('.weather-station-fallback')).toHaveCount(0)
+  await expect(page.locator('.temperature')).toContainText('17')
+  await expect(page.locator('.temperature')).toContainText('21', { timeout: 5000 })
 })
 
 test('uses the Worker forecast fallback when Open-Meteo cannot be reached', async ({ page }) => {

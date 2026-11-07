@@ -14,7 +14,7 @@ Clima, previsão do tempo, notícias e informações úteis em um só lugar. Use
 
 ## O que você encontra
 
-- **Clima e previsão:** condições atuais, próximas horas e previsão dos próximos dias. Quando disponível, a temperatura observada em uma estação automática próxima do INMET é comparada com a estimativa do Open-Meteo. Os dados podem não refletir exatamente as condições locais.
+- **Clima e previsão:** condições atuais, próximas horas e previsão dos próximos dias, fornecidas pelo Open-Meteo. O app mostra dados salvos imediatamente quando disponíveis e atualiza em segundo plano; os valores podem não refletir exatamente as condições locais.
 - **Satélite:** imagens meteorológicas recentes do INMET, com controles para animar e escolher os horários. Se o INMET retornar erro 503, o painel informa que a fonte do satélite está temporariamente indisponível, não que o app parou de funcionar.
 - **Notícias:** manchetes organizadas por assuntos, com links para abrir as fontes.
 - **Cotações:** valores de referência do dólar e do euro.
